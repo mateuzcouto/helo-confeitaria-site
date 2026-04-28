@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "helo-confeitaria"
+  },
+  "targets": {
+    "helo-confeitaria": {
+      "hosting": {
+        "heloconfeitarianr": [
+          "heloconfeitarianr"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+# ── Dependências ──────────────────────────────────────────────
+node_modules/
+**/node_modules/
+
+# ── Firebase ─────────────────────────────────────────────────
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# ── Arquivos sensíveis (NUNCA commitar) ─────────────────────
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+*.p12
+config.local.*
+secrets.*
+credentials.*
+service-account*.json
+google-credentials*.json
+
+# ── Logs, backups e dumps ───────────────────────────────────
+logs/
+backups/
+dump/
+*.log
+*.sql.gz
+*.sql.dump
+
+# ── Build de saída (regenerado automaticamente) ─────────────
+public/js-build/
+
+# ── IDE / Sistema ───────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ── Cache ────────────────────────────────────────────────────
+.eslintcache
+.cache/

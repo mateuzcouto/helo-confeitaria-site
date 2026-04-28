@@ -1,0 +1,192 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isConcludedOrderStatus(status) {
+      return status is string && status.lower() in ["concluido", "concluído"];
+    }
+
+    function hasConcludableStockReservation(orderData) {
+      return orderData.stockReservation is map &&
+        orderData.stockReservation.status is string &&
+        orderData.stockReservation.status in [
+          "applied",
+          "no_limited_products",
+          "skipped_no_product_ids"
+        ];
+    }
+
+    function canUpdateOrder(currentOrder, nextOrder) {
+      return !isConcludedOrderStatus(nextOrder.status) ||
+        isConcludedOrderStatus(currentOrder.status) ||
+        hasConcludableStockReservation(nextOrder);
+    }
+
+    function isOrderOwner(orderData) {
+      return isSignedIn() &&
+        orderData.createdByUid is string &&
+        orderData.createdByUid == request.auth.uid;
+    }
+
+    function canCreateOrder(orderData) {
+      return isSignedIn() &&
+        orderData.createdByUid is string &&
+        orderData.createdByUid == request.auth.uid &&
+        orderData.status is string;
+    }
+
+    // Base de dados da aplicação
+    match /artifacts/helo-confeitaria/public/data/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /artifacts/helo-confeitaria/public/data/products/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/orders/{doc} {
+      allow read: if isAdmin() || isOrderOwner(resource.data);
+      allow create: if canCreateOrder(request.resource.data);
+      allow update: if isAdmin() && canUpdateOrder(resource.data, request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/campanhas/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/coupons/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/ingredients/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/recipes/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    // NOVO: agenda manual do admin
+    match /artifacts/helo-confeitaria/public/data/agendamentos/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    // NOVO: conversoes usadas em producao
+    match /artifacts/helo-confeitaria/public/data/conversions/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/meta/site_settings {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Contador legado de visitas — escrita restrita a campos esperados
+    // Visitante pode incrementar count (via FieldValue.increment) e
+    // atualizar lastVisit (via serverTimestamp). Não pode sobrescrever
+    // outros campos nem deletar o documento.
+    match /artifacts/helo-confeitaria/public/data/meta/visits {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() &&
+        // Apenas campos count e lastVisit podem ser alterados por não-admin
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['count', 'lastVisit']);
+      allow delete: if isAdmin();
+    }
+
+    // NOVO: inputs de producao usados no painel admin
+    match /artifacts/helo-confeitaria/public/data/meta/production_inputs {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // NOVO: controle da migracao de campanhas
+    match /artifacts/helo-confeitaria/public/data/meta/campaigns_migration_v1 {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/feedbacks/{doc} {
+      allow read: if isAdmin();
+      // Visitante pode criar feedback (fluxo de feedback do cliente).
+      // Visitante pode atualizar APENAS campos de resposta (impede alterar
+      // campos admin como invitedAt, feedbackUrl). Admin pode atualizar tudo.
+      allow create: if isSignedIn();
+      allow update: if isAdmin() ||
+        (isSignedIn() &&
+          // Campos de resposta do cliente — único conjunto permitido para não-admin
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['liked', 'buyAgain', 'recommend', 'rating', 'comment', 'answeredAt', 'status', 'customerName', 'customerPhone', 'orderId']));
+      allow delete: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/financeiro/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/financial/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/transactions/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/caixa/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/fechamentos/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /artifacts/helo-confeitaria/public/data/fechamentos_caixa/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Entregadores
+    match /artifacts/helo-confeitaria/public/data/drivers/{doc} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Visitantes - registro detalhado de acessos (UTM, device, source)
+    // Cada visita cria um doc novo com ID único (visitorId + timestamp).
+    // Create-only: visitante não pode atualizar ou sobrescrever visitas.
+    // Update permitido apenas para admin (caso precise corrigir dados).
+    match /artifacts/helo-confeitaria/public/data/site_visits/{doc} {
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow read: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /admin-settings/admin_users/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /admin-settings/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /fechamentos_caixa/{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

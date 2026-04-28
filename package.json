@@ -1,0 +1,18 @@
+{
+  "name": "site-helo-final",
+  "version": "1.0.0",
+  "description": "Build local dos scripts JSX do site da Helo Confeitaria.",
+  "scripts": {
+    "build:public": "node ./scripts/build-public-js.js",
+    "prepare:hosting": "npm run build:public && node ./scripts/stamp-version.js && node ./scripts/strip-bom.js public",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:hosting:ci": "firebase deploy --project helo-confeitaria --only hosting"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

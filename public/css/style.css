@@ -1,0 +1,989 @@
+      @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Great+Vibes&family=Nunito:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            overscroll-behavior-x: none;
+        }
+
+        html,
+        body,
+        #root {
+            min-height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #root {
+            position: relative;
+            isolation: isolate;
+        }
+
+        img {
+            display: block;
+            max-width: 100%;
+        }
+
+        input,
+        button,
+        select,
+        textarea {
+            font: inherit;
+        }
+
+        ::selection {
+            background: #875F00;
+            color: #F3D494;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        body {
+            font-family: 'Nunito', 'Plus Jakarta Sans', sans-serif;
+            background-color: #2A3D5D;
+            background-image: none;
+            color: #2A3D5D;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            overscroll-behavior-x: none;
+            touch-action: pan-y pinch-zoom;
+        }
+
+        body.admin-active {
+            background-color: #f8fafc;
+            background-image: none;
+        }
+
+        body.admin-active #root {
+            z-index: 1000;
+        }
+
+        .admin-shell {
+            position: relative;
+            z-index: 1000;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                background-color: #2A3D5D;
+            }
+        }
+
+        .font-brand {
+            font-family: 'Great Vibes', cursive;
+        }
+
+        /* ── Tokens ── */
+        :root {
+            --brand-backdrop-image: none;
+            --primary: #2A3D5D;
+            --blue-mid: #3A527E;
+            --cream: #F3D494;
+            --gold: #875F00;
+            --gold-soft: #b28726;
+            --vichy-a: #fffdf5;
+            --vichy-b: #f8e4b7;
+            --s50: #f8fafc;
+            --s100: #f1f5f9;
+            --s200: #e2e8f0;
+            --s300: #cbd5e1;
+            --s400: #64748b;
+            --s500: #475569;
+            --s600: #334155;
+            --s800: #1e293b;
+        }
+
+        /* ── Utilities ── */
+        .card-shadow {
+            box-shadow: 0 10px 40px -10px rgba(42, 61, 93, .15);
+        }
+
+        .main-content {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            background-color: #2A3D5D;
+            background-image: none;
+            isolation: isolate;
+        }
+
+        .main-content::before,
+        .main-content::after {
+            display: none;
+        }
+
+        .main-content::before {
+            left: 0;
+            background-position: center, left top;
+        }
+
+        .main-content::after {
+            right: 0;
+            background-position: center, right top;
+        }
+
+        body.admin-active .main-content::before,
+        body.admin-active .main-content::after {
+            display: none;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        /* ── Loader ── */
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #1C2638;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── Animations ── */
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(-25%)
+            }
+
+            50% {
+                transform: translateY(0)
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(.97)
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1)
+            }
+        }
+
+        @keyframes slideRight {
+            from {
+                transform: translateX(100%)
+            }
+
+            to {
+                transform: translateX(0)
+            }
+        }
+
+        @keyframes neonPulse {
+
+            0%,
+            100% {
+                color: rgba(243, 212, 148, 0.4);
+                text-shadow: 0 0 2px rgba(243, 212, 148, 0.1)
+            }
+
+            50% {
+                color: #F3D494;
+                text-shadow: 0 0 4px rgba(243, 212, 148, 0.6), 0 0 12px rgba(243, 212, 148, 0.4)
+            }
+        }
+
+        @keyframes textShine {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            100% {
+                background-position: 200% 50%;
+            }
+        }
+
+        @keyframes brandLightSweep {
+            0% {
+                transform: translateX(-120%);
+                opacity: 0;
+            }
+
+            12% {
+                opacity: 1;
+            }
+
+            45% {
+                transform: translateX(120%);
+                opacity: 1;
+            }
+
+            60% {
+                opacity: 0;
+            }
+
+            100% {
+                transform: translateX(120%);
+                opacity: 0;
+            }
+        }
+
+        @keyframes floatBadge {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-4px);
+            }
+        }
+
+        .animate-bounce {
+            animation: bounce 1s infinite;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn .3s ease both;
+        }
+
+        .animate-slide-right {
+            animation: slideRight .3s ease both;
+        }
+
+        .animate-neon-pulse {
+            animation: neonPulse 2.5s infinite ease-in-out;
+        }
+
+        .animate-float-badge {
+            animation: floatBadge 3s ease-in-out infinite;
+        }
+
+        .animate-text-shine {
+            background: linear-gradient(110deg, var(--cream) 20%, #fffbe0 50%, var(--cream) 80%);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: textShine 3.5s linear infinite;
+        }
+
+        /* ── Efeitos Neon (Hover/Focus) para Cards de Produtos ── */
+        .card-neon-hover {
+            transition: all 0.3s ease;
+            outline: none;
+            /* Remove a borda padrão de foco do navegador */
+            border: 1px solid #f8fafc;
+        }
+
+        /* Aplica o efeito quando o mouse passa por cima (hover), é focado pelo teclado (focus) ou é tocado na tela (active) */
+        .card-neon-hover:hover,
+        .card-neon-hover:focus,
+        .card-neon-hover:focus-within,
+        .card-neon-hover:active {
+            transform: translateY(-8px);
+            box-shadow: 0 0 25px rgba(135, 95, 0, 0.4), 0 0 50px rgba(135, 95, 0, 0.15), 0 10px 40px -10px rgba(42, 61, 93, 0.15);
+            border-color: rgba(135, 95, 0, 0.4);
+            z-index: 20;
+            /* Traz o card ligeiramente para a frente */
+        }
+
+        /* Animação da imagem dentro do card */
+        .card-neon-hover .thumb img {
+            transition: transform 0.45s ease;
+        }
+
+        .card-neon-hover:hover .thumb img,
+        .card-neon-hover:focus .thumb img,
+        .card-neon-hover:focus-within .thumb img,
+        .card-neon-hover:active .thumb img {
+            transform: scale(1.03);
+        }
+
+        /* ── Status select ── */
+        select.status-select {
+            -webkit-appearance: none;
+            appearance: none;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        /* ── Date/Time inputs ── */
+        .dt-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .dt-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--s400);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .dt-input {
+            width: 100%;
+            padding: .75rem .6rem;
+            border-radius: .75rem;
+            border: 1.5px solid var(--s200);
+            font-size: 14px;
+            font-weight: 600;
+            background: #fff;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            font-family: inherit;
+            color: var(--s400);
+        }
+
+        .dt-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(42, 61, 93, .15);
+        }
+
+        .dt-input.has-value {
+            color: var(--primary);
+        }
+
+        input[type="time"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            opacity: .6;
+        }
+
+        input::placeholder {
+            color: rgba(207, 168, 96, 0.8);
+        }
+
+        .hero-section {
+            background: transparent;
+            position: relative;
+            z-index: 1;
+            overflow-x: hidden;
+        }
+
+
+
+        .brand-title {
+            font-family: 'Great Vibes', cursive;
+        }
+
+        .brand-copy {
+            font-family: 'Cormorant Garamond', 'Plus Jakarta Sans', serif;
+        }
+
+        .bg-vichy {
+            background-image:
+                linear-gradient(45deg, var(--vichy-b) 25%, transparent 25%),
+                linear-gradient(-45deg, var(--vichy-b) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, var(--vichy-b) 75%),
+                linear-gradient(-45deg, transparent 75%, var(--vichy-b) 75%);
+            background-size: 28px 28px;
+            background-position: 0 0, 0 14px, 14px -14px, -14px 0;
+            background-color: var(--vichy-a);
+        }
+
+        .ribbon-knot::before,
+        .ribbon-knot::after {
+            content: '';
+            position: absolute;
+            top: -8px;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            background: var(--blue-mid);
+            opacity: 0.7;
+            transform: rotate(45deg);
+        }
+
+        .ribbon-knot::before {
+            left: 18px;
+        }
+
+        .ribbon-knot::after {
+            right: 18px;
+        }
+
+        .cta-gold {
+            background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+            color: #fff;
+            border: none;
+            box-shadow: 0 12px 26px -12px rgba(135, 95, 0, 0.8);
+        }
+
+        .cta-gold:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+        }
+
+        .section-enter {
+            animation: fadeIn .45s ease both;
+        }
+
+        .brand-mark-wrap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            aspect-ratio: 4.6 / 1;
+            max-height: 162px;
+            position: relative;
+            overflow: hidden;
+            background: transparent;
+            border-radius: 16px;
+        }
+
+        .hero-section .brand-mark-wrap::after {
+            display: none;
+        }
+
+        .brand-subtitle {
+            font-family: 'Cormorant Garamond', serif;
+            color: var(--cream);
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        .brand-plaque {
+            background: linear-gradient(180deg, rgba(42, 61, 93, 0.98), rgba(42, 61, 93, 0.94));
+            border: 1px solid rgba(243, 212, 148, 0.14);
+            box-shadow: 0 30px 60px -30px rgba(21, 29, 44, 0.72);
+        }
+
+        .brand-logo-svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            overflow: visible;
+        }
+
+        .brand-logo-image {
+            position: absolute;
+            inset: 0;
+            background-image: url('../LOGO HELÔ.png?v=20260414-1');
+            background-size: contain !important;
+            background-repeat: no-repeat !important;
+            background-position: center !important;
+            transform: translateZ(0) scale(1);
+            transform-origin: center;
+            filter: none;
+        }
+
+            .hero-section .brand-logo-image {
+                inset: 0;
+                background-size: contain !important;
+                background-repeat: no-repeat !important;
+                background-position: center !important;
+                filter: none;
+            }
+
+        .hero-section .brand-mark-wrap {
+            max-height: 172px;
+        }
+
+        .brand-logo-svg .word-mark {
+            letter-spacing: -1.5px;
+        }
+
+        .brand-logo-svg .mark-subtitle {
+            letter-spacing: 0.08em;
+        }
+
+        .brand-plaque {
+            background:
+                radial-gradient(circle at 85% -10%, rgba(243, 212, 148, 0.25), rgba(243, 212, 148, 0) 58%),
+                linear-gradient(160deg, rgba(34, 50, 76, 0.98) 0%, rgba(38, 57, 87, 0.96) 52%, rgba(30, 44, 67, 0.98) 100%);
+            border: 1px solid rgba(243, 212, 148, 0.24);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 248, 220, 0.35),
+                0 34px 70px -34px rgba(16, 22, 33, 0.92);
+        }
+
+        .logo-focus-shell {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+        }
+
+        footer .logo-focus-shell {
+            width: min(100%, 520px) !important;
+        }
+
+        footer .brand-logo-image {
+            inset: 0;
+            background-size: contain !important;
+            background-repeat: no-repeat !important;
+            background-position: center !important;
+        }
+
+        footer .brand-mark-wrap {
+            aspect-ratio: 2.4 / 1;
+            max-height: 220px;
+        }
+
+        .hero-logo-stage {
+            width: min(100%, 1080px);
+            display: flex;
+            justify-content: center;
+        }
+
+        .floating-cart-btn {
+            position: fixed;
+            right: clamp(0.7rem, 2vw, 1.2rem);
+            bottom: clamp(0.9rem, 2.2vw, 1.4rem);
+            background: linear-gradient(135deg, #c39332 0%, #875f00 100%);
+            color: #fff;
+            border: 1px solid rgba(255, 238, 205, 0.4);
+            border-radius: 9999px;
+            min-width: 54px;
+            height: 54px;
+            padding: 0 15px;
+            cursor: pointer;
+            z-index: 95;
+            justify-content: center;
+            box-shadow:
+                0 18px 30px -20px rgba(9, 14, 24, 0.95),
+                0 12px 20px -16px rgba(135, 95, 0, 0.9);
+            transition: transform .18s ease, filter .18s ease;
+        }
+
+        .floating-cart-btn:hover {
+            filter: brightness(1.06);
+            transform: translateY(-1px);
+        }
+
+        .top-cart-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #fff;
+            font-size: 10px;
+            width: 21px;
+            height: 21px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #fff;
+            font-weight: 800;
+        }
+
+        .hero-premium {
+            padding-top: 0.9rem;
+            padding-bottom: 3.7rem;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 28px 20px;
+            background: transparent;
+        }
+
+        .helo-logo {
+            width: 100%;
+            max-width: 1400px;
+            height: 600px;
+            background-image: url('../LOGO HELÔ.png?v=20260414-1');
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            margin: 0 auto 10px;
+        }
+
+        .slogan {
+            color: #e6c794;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            text-align: center;
+            font-weight: 700;
+            margin: 0;
+        }
+
+
+
+        .hero-tagline {
+            margin-top: 1rem;
+            font-size: clamp(0.92rem, 2.5vw, 1.12rem);
+            font-weight: 800;
+            color: #e2bd7a;
+            background: linear-gradient(112deg,
+                    #f7e7bf 8%,
+                    #e3bf7c 28%,
+                    #bf8622 44%,
+                    #f8ebc9 54%,
+                    #c58d2b 70%,
+                    #9d680f 100%);
+            background-size: 230% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow:
+                0 1px 1px rgba(255, 232, 184, 0.2),
+                0 2px 4px rgba(157, 104, 15, 0.18),
+                0 0 8px rgba(246, 219, 156, 0.16);
+            letter-spacing: .1em;
+            animation: textShine 5.8s linear infinite;
+        }
+
+        .hero-subcopy {
+            margin-top: .65rem;
+            font-size: 13px;
+            color: rgba(243, 212, 148, .9);
+            font-weight: 700;
+            max-width: 560px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.5;
+        }
+
+        .catalog-shell {
+            padding: 1rem;
+            max-width: 80rem;
+            margin: 1.5rem auto 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1.25rem;
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            width: 100%;
+            overflow-x: hidden;
+        }
+
+        .premium-banner {
+            grid-column: 1/-1;
+            border-radius: 1.5rem;
+            padding: 1.2rem 1.4rem;
+            border: 1px solid rgba(58, 82, 126, .24);
+            box-shadow: 0 14px 32px -28px rgba(24, 34, 50, .7);
+        }
+
+        .scarcity-banner {
+            grid-column: 1/-1;
+            background:
+                radial-gradient(circle at 80% -16%, rgba(255, 248, 225, 0.72), rgba(255, 248, 225, 0) 52%),
+                linear-gradient(130deg, #f5dfac 0%, #cfa860 42%, #b38322 100%);
+            border-radius: 2rem;
+            padding: 2rem;
+            margin-bottom: .5rem;
+            box-shadow: 0 22px 34px -18px rgba(150, 106, 15, .52);
+            position: relative;
+            overflow: hidden;
+            color: var(--primary);
+            border: 1px solid rgba(108, 73, 5, 0.24);
+        }
+
+        .policy-banner {
+            grid-column: 1/-1;
+            border-radius: 1.7rem;
+            padding: 1.25rem;
+            margin-bottom: .25rem;
+            border: 1px solid rgba(243, 212, 148, 0.28);
+            position: relative;
+            box-shadow: 0 18px 32px -24px rgba(10, 17, 28, 0.88);
+            background-image:
+                linear-gradient(160deg, rgba(22, 33, 50, 0.9), rgba(28, 43, 69, 0.82)),
+                var(--brand-backdrop-image);
+            background-size: auto, cover;
+            background-repeat: no-repeat;
+            background-position: center top;
+        }
+
+        .search-shell {
+            grid-column: 1/-1;
+            max-width: 33rem;
+            width: 100%;
+            margin: 0 auto 1rem;
+            background: linear-gradient(120deg, rgba(27, 41, 64, .84), rgba(42, 61, 93, .78));
+            padding: 10px 16px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(243, 212, 148, .5);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 10px 22px -18px rgba(18, 28, 45, 0.9);
+        }
+
+        .category-pill {
+            border: 1px solid #cdd8ec;
+            background: #fff;
+            color: var(--primary);
+            border-radius: 9999px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+
+        .category-pill:hover {
+            border-color: rgba(135, 95, 0, .42);
+            transform: translateY(-1px);
+        }
+
+        .category-pill.active {
+            border-color: var(--gold);
+            background: rgba(135, 95, 0, .11);
+            color: var(--gold);
+        }
+
+        .catalog-premium-title {
+            color: var(--cream);
+            background: linear-gradient(135deg, #f7e6b5 0%, #d4aa58 45%, #875f00 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+        }
+
+        .catalog-premium-meta {
+            color: rgba(243, 212, 148, .9);
+            text-shadow: 0 4px 12px rgba(0, 0, 0, .16);
+        }
+
+        /* ── Skeleton Loader: esqueleto visual enquanto catálogo carrega ── */
+        @keyframes skeleton-shimmer-anim {
+            0%   { background-position: -300% 0; }
+            100% { background-position:  300% 0; }
+        }
+
+        .catalog-skeleton-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+            gap: 1rem;
+        }
+
+        .skeleton-card {
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .skeleton-img {
+            width: 100%;
+            height: 160px;
+            background: #e2e8f0;
+        }
+
+        .skeleton-body {
+            padding: 14px 16px 18px;
+        }
+
+        .skeleton-line {
+            height: 14px;
+            border-radius: 6px;
+            background: #e2e8f0;
+        }
+
+        .skeleton-shimmer {
+            background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+            background-size: 300% 100%;
+            animation: skeleton-shimmer-anim 1.6s ease-in-out infinite;
+        }
+
+        .product-card-premium {
+            background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+            border-radius: 1.6rem;
+            border: 1px solid rgba(58, 82, 126, .18);
+            box-shadow: 0 20px 34px -30px rgba(17, 25, 39, .82);
+        }
+
+        .product-card-premium .thumb {
+            border: 1px solid rgba(148, 163, 184, .16);
+        }
+
+        .product-card-name {
+            font-size: 1.2rem;
+            font-weight: 900;
+            line-height: 1.22;
+            letter-spacing: .01em;
+            margin-bottom: 4px;
+            color: #000;
+        }
+
+        .cart-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(8, 12, 21, .66);
+            backdrop-filter: blur(7px);
+        }
+
+        .cart-panel {
+            background:
+                radial-gradient(circle at 100% -8%, rgba(243, 212, 148, .16), rgba(243, 212, 148, 0) 36%),
+                linear-gradient(180deg, #ffffff 0%, #fdfefe 100%);
+            border-left: 1px solid rgba(58, 82, 126, .2);
+            box-shadow: -22px 0 48px -30px rgba(10, 18, 30, .85);
+        }
+
+        .cart-section {
+            background: linear-gradient(180deg, rgba(255, 254, 248, .95), rgba(255, 252, 240, .88));
+            border: 1px solid rgba(207, 168, 96, .35);
+            border-radius: 1.35rem;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+        }
+
+        .cart-summary-panel {
+            border-top: 1px solid rgba(226, 232, 240, .9);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(253, 251, 244, .96));
+        }
+
+        .cart-finish-btn {
+            width: 100%;
+            margin-top: 1rem;
+            background: linear-gradient(135deg, #bf8d29 0%, #875f00 100%);
+            color: #fff;
+            padding: 1.25rem;
+            border-radius: 1.15rem;
+            font-weight: 800;
+            border: 1px solid rgba(255, 233, 186, .4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 16px;
+            box-shadow: 0 20px 25px -12px rgba(135, 95, 0, .48);
+            transition: filter .2s ease, transform .2s ease;
+        }
+
+        .cart-finish-btn:hover {
+            filter: brightness(1.06);
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 768px) {
+            .hero-premium {
+                padding-top: 0.8rem;
+                padding-bottom: 2.8rem;
+            }
+
+            .logo-wrapper {
+                padding: 20px 12px;
+            }
+
+            .helo-logo {
+                height: 400px;
+                max-width: 100%;
+            }
+
+            .slogan {
+                font-size: 1rem;
+                letter-spacing: 1.4px;
+            }
+
+            .hero-logo-stage {
+                width: min(100%, 95vw);
+            }
+
+            .brand-mark-wrap {
+                aspect-ratio: 4.3 / 1;
+                max-height: 128px;
+                border-radius: 12px;
+            }
+
+            footer .brand-mark-wrap {
+                aspect-ratio: 2.3 / 1;
+                max-height: 170px;
+            }
+
+            .hero-section .brand-logo-image {
+                inset: 0;
+                background-size: contain !important;
+                background-repeat: no-repeat !important;
+                background-position: center !important;
+            }
+
+            footer .brand-logo-image {
+                inset: 0;
+                background-size: contain !important;
+                background-repeat: no-repeat !important;
+                background-position: center !important;
+            }
+
+            .hero-section,
+            .catalog-shell,
+            .search-shell,
+            .policy-banner,
+            .scarcity-banner,
+            .premium-banner,
+            .main-content,
+            #root {
+                max-width: 100%;
+                overflow-x: hidden;
+            }
+
+            .catalog-shell {
+                padding-left: 0.8rem;
+                padding-right: 0.8rem;
+                grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+            }
+
+            .search-shell {
+                max-width: 100%;
+            }
+
+            .brand-subtitle {
+                white-space: normal;
+            }
+
+            .scarcity-banner {
+                border-radius: 1.4rem;
+                padding: 1.4rem;
+            }
+
+            .main-content::before,
+            .main-content::after {
+                width: clamp(24px, 3.6vw, 34px);
+                background-size: auto, 180px 180px;
+            }
+
+            .floating-cart-btn {
+                height: 50px;
+                min-width: 50px;
+                padding: 0 13px;
+                right: 0.7rem;
+                bottom: 0.8rem;
+            }
+        }
