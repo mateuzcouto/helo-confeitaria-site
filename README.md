@@ -21,6 +21,7 @@ Clientes navegam pelo catálogo, montam pedidos no carrinho e finalizam via What
 
 - Catálogo de produtos com abas de menu dinâmicas (deduzidas dos produtos cadastrados)
 - Badge de **Mais Vendido** calculado por `productId` com deduplicação
+- **Assistente de IA** — Chatbot treinado com base de conhecimento da confeitaria para responder dúvidas sobre produtos, pedidos, pagamentos, entrega e políticas
 - Carrinho lateral (drawer) com formulário completo:
   - Dados do cliente (nome, WhatsApp)
   - Escolha de retirada ou entrega (controle admin de ativação/desativação)
@@ -53,6 +54,7 @@ Clientes navegam pelo catálogo, montam pedidos no carrinho e finalizam via What
 - **Proteção de conclusão** — Impede concluir pedido sem reserva de estoque válida
 - **Admin Claim API** — Endpoint seguro para atribuir custom claim `admin` a e-mails autorizados
 - **QZ Tray API** — Endpoints de assinatura digital e certificado para impressão térmica segura (chaves privadas no servidor, nunca expostas ao front-end)
+- **Assistente de IA (grokChat)** — Proxy seguro para API Groq com base de conhecimento dinâmica, rate limiting (10 req/min por IP) e CORS configurado
 
 ### Impressão Térmica
 
@@ -180,6 +182,7 @@ site-helo-final/
    - `EMAILJS_SERVICE_ID`, `EMAILJS_TEMPLATE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_PRIVATE_KEY` — Configuração EmailJS
    - `EMAILJS_NOTIFY_EMAILS` — E-mails destinatários de notificação
    - `ADMIN_ALLOWED_EMAILS` — E-mails autorizados a receber claim de admin
+   - `GROQ_API_KEY` — Chave de API do Groq para assistente de IA (obter em https://console.groq.com/keys)
 
 5. **Faça login no Firebase:**
    ```bash
