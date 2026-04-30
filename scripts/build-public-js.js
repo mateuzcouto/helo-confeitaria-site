@@ -13,6 +13,7 @@ const filesToCompile = [
     'components/rodape-site.component.js',
     'components/product-card.component.js',
     'components/vitrine-produtos.component.js',
+    'components/chat-widget.component.js',
     'core/utils/admin-utils.js',
     'core/catalog.js',
     'script.js',
