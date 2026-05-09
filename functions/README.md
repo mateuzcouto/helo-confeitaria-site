@@ -1,43 +1,65 @@
-# QZ Security Endpoints
+# Firebase Functions — Helô Confeitaria
 
-This folder contains backend endpoints required by QZ Tray trusted signing flow.
+Este diretório contém as Cloud Functions do projeto, incluindo APIs de segurança para QZ Tray, sincronização de claim de admin, proxy de IA (Groq) e trigger de notificação por e-mail.
 
-It also contains a Firestore trigger that sends order notifications through EmailJS on the server side (no EmailJS credentials in frontend).
+## Endpoints HTTP expostos via Hosting rewrites
 
-## Endpoints
+### Segurança QZ Tray
 
-- `GET /api/qz/certificate` -> returns JSON with `certificate`
-- `POST /api/qz/sign` -> signs incoming payload and returns JSON with `signature`
-- `POST /api/admin/claim/sync` -> verifies authenticated user token and applies custom claim `admin` if email is present in backend allowlist (`ADMIN_ALLOWED_EMAILS`).
+- `GET /api/qz/certificate` — retorna o certificado público para handshake do QZ.
+- `POST /api/qz/sign` — assina o payload de impressão no backend.
 
-## Firestore Triggers
+### Administração
 
-- `sendOrderNotificationEmail` -> triggered on `orders` creation and sends EmailJS notifications from backend.
+- `POST /api/admin/claim/sync` — valida token autenticado e aplica claim `admin` para e-mails autorizados em `ADMIN_ALLOWED_EMAILS`.
 
-## Environment Variables
+### Assistente de IA
 
-Set these in your deployment environment:
+- `POST /api/groq/chat` — endpoint público via rewrite para a function `groqChat`.
+- Produção: o front chama `/api/groq/chat` no mesmo domínio.
+- Localhost: o front pode chamar a URL direta da function conforme implementação do widget.
+- Segurança/custo: quando `site_settings.aiEnabled !== true`, o endpoint retorna `403` (`code: ai_disabled`).
+- A leitura de `aiEnabled` usa cache curto em memória no backend para reduzir overhead por requisição.
 
-- `QZ_CERT_PEM`: public certificate PEM
-- `QZ_PRIVATE_KEY_PEM`: private key PEM used for signatures
-- `EMAILJS_SERVICE_ID`: EmailJS service ID
-- `EMAILJS_TEMPLATE_ID`: EmailJS template ID
-- `EMAILJS_PUBLIC_KEY`: EmailJS public key
-- `EMAILJS_PRIVATE_KEY`: EmailJS private key/access token
-- `EMAILJS_NOTIFY_EMAILS`: comma-separated recipients list
-- `ADMIN_ALLOWED_EMAILS`: comma-separated admin emails allowed to receive custom claim `admin`
+## Trigger Firestore
 
-Both values can be stored with real newlines or escaped `\\n`.
+- `sendOrderNotificationEmail` — dispara ao criar pedido em `orders` e envia notificação EmailJS pelo backend.
 
-## Local test
+## Base de conhecimento da IA
 
-1. Install deps in `functions/`:
+- Arquivo efetivamente lido em runtime: `functions/BASE_CONHECIMENTO_IA_ATENDIMENTO.md`.
+- Se você editar a cópia na raiz do projeto (`../BASE_CONHECIMENTO_IA_ATENDIMENTO.md`), sincronize para `functions/` antes do deploy.
+
+## Variáveis de ambiente
+
+Defina no ambiente de execução (`functions/.env` em local e secrets/config no deploy):
+
+- `QZ_CERT_PEM` — certificado PEM público.
+- `QZ_PRIVATE_KEY_PEM` — chave privada PEM usada para assinatura.
+- `EMAILJS_SERVICE_ID`
+- `EMAILJS_TEMPLATE_ID`
+- `EMAILJS_PUBLIC_KEY`
+- `EMAILJS_PRIVATE_KEY`
+- `EMAILJS_NOTIFY_EMAILS` — lista de destinatários separada por vírgula.
+- `ADMIN_ALLOWED_EMAILS` — e-mails autorizados a receber claim admin.
+- `GROQ_API_KEY` — chave de API da Groq.
+
+Observação: valores PEM podem ser salvos com quebra real de linha ou com `\\n`.
+
+## Desenvolvimento local
+
+1. Instalar dependências:
    - `npm install`
-2. Copy `.env.example` to `.env` and fill values.
-3. Run Firebase emulators with functions + hosting.
+2. Criar arquivo de ambiente:
+   - copiar `.env.example` para `.env` e preencher os valores.
+3. Subir emuladores na raiz do projeto:
+   - `firebase emulators:start`
 
 ## Deploy
 
-- `firebase deploy --only functions,hosting`
+- Apenas functions:
+  - `firebase deploy --only functions`
+- Functions + hosting:
+  - `firebase deploy --only functions,hosting`
 
-Keep the private key secret. Never expose it in frontend code.
+Nunca exponha chaves privadas no frontend.

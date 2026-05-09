@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   main-app.js — COMPONENTE PRINCIPAL DA APLICAÇÃO (App)
+   main-app.js — ENTRYPOINT DA VITRINE PÚBLICA
+   Deploy: 08/05/2026 | Versão: 20260508-235421
    ═══════════════════════════════════════════════════════════════════════
    Este é o componente raiz do site da Helô Confeitaria. Ele centraliza:
 
@@ -24,9 +25,7 @@ const App = () => {
        ════════════════════════════════════════════════════════════════
        - user: usuário Firebase (null se não autenticado)
        - products: lista de produtos do catálogo (collection 'products')
-       - allOrders: todos os pedidos (collection 'orders')
        - campaigns: campanhas cadastradas (collection 'campanhas')
-       - ordersLoaded: flag indicando se pedidos já foram carregados
        - allCoupons: cupons de desconto disponíveis (collection 'coupons')
        - financialEntries: lançamentos financeiros (collection 'financeiro')
        - visitsData: contador de visitas ao site (doc 'visits')
@@ -36,50 +35,35 @@ const App = () => {
        - ingredients / recipes: dados de estoque (só carrega se admin) */
     const [user, setUser] = useState(null);
     const [products, setProducts] = useState([]);
-    const [allOrders, setAllOrders] = useState([]);
     const [campaigns, setCampaigns] = useState([]);
-    const [ordersLoaded, setOrdersLoaded] = useState(false);
     const [catalogLoaded, setCatalogLoaded] = useState(false);
     const [allCoupons, setAllCoupons] = useState([]);
-    const [financialEntries, setFinancialEntries] = useState([]);
-    const [visitsData, setVisitsData] = useState({ count: 0, lastVisit: null });
-    const [siteSettings, setSiteSettings] = useState({ maxUnits: 70, orderDeadline: '2026-03-31T19:00', siteMode: 'livre', campaignMode: CAMPAIGN_MODE_MANUAL, activeCampaignOverrideId: '', isDeliveryAvailable: true, chavePix: '88996549074', nomeTitularPix: '', ...DEFAULT_THERMAL_PRINT_SETTINGS });
-    const [ingredients, setIngredients] = useState([]);
-    const [recipes, setRecipes] = useState([]);
+    const [siteSettings, setSiteSettings] = useState({
+        maxUnits: 70, orderDeadline: '2026-03-31T19:00', siteMode: 'livre',
+        campaignMode: CAMPAIGN_MODE_MANUAL, activeCampaignOverrideId: '',
+        isDeliveryAvailable: true, chavePix: '88996549074', nomeTitularPix: '',
+        ...DEFAULT_THERMAL_PRINT_SETTINGS
+    });
+    const [siteSettingsLoaded, setSiteSettingsLoaded] = useState(false);
 
-    /* ── Estados de UI e controle geral ──────────────────────────────
+    /* ── Estados de UI e controle da vitrine ───────────────────────
        - isCartOpen: drawer do carrinho aberto/fechado
-       - isAdmin: usuário tem privilégio de administrador
        - isSaving: pedido está sendo salvo (mostra spinner)
        - dbError: mensagem de erro do banco (banner fixo)
        - searchTerm: texto de busca na vitrine de produtos
        - successData: URL do WhatsApp após pedido salvo (modal de sucesso)
-       - showLoginModal / loginEmail / loginPassword / loginLoading: modal de login admin */
+
+       NOTA (Fase 2 — Otimização): estados admin (isAdmin, loginEmail,
+       loginPassword, etc.) foram removidos da vitrine e migrados para
+       app-admin.js (entrypoint exclusivo do painel administrativo). */
     const [isCartOpen, setIsCartOpen] = useState(false);
-    const [isAdmin, setIsAdmin] = useState(false);
-    /* ── Ref para isAdmin — permite error handlers lerem valor atual ──
-       Listeners públicos são criados no mount (isAdmin=false) mas
-       error handlers precisam saber se o usuário se tornou admin depois.
-       Sem o ref, o closure capturaria isAdmin=false para sempre. */
-    const isAdminRef = React.useRef(false);
-    useEffect(() => { isAdminRef.current = isAdmin; }, [isAdmin]);
-    /* ── Ref para login em progresso — evita race condition ────────
-       Quando handleEmailLogin está em andamento, ele sincroniza a
-       claim admin (syncAdminClaimForUser + awaitAdminClaimPropagation)
-       ANTES de setar isAdmin=true. Sem este ref, onAuthStateChanged
-       dispara setIsAdmin(false) logo após signInWithEmailAndPassword
-       (claim ainda não propagou), causando flash Vitrine→AdminPanel.
-       Com o ref, onAuthStateChanged apenas seta o user e pula a
-       verificação de claim — handleEmailLogin assume o controle. */
-    const loginInProgressRef = React.useRef(false);
     const [isSaving, setIsSaving] = useState(false);
     const [dbError, setDbError] = useState(null);
+    const [loadingHint, setLoadingHint] = useState('');
+    const [chatWidgetComponent, setChatWidgetComponent] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [successData, setSuccessData] = useState(null);
-    const [showLoginModal, setShowLoginModal] = useState(false);
-    const [loginEmail, setLoginEmail] = useState('');
-    const [loginPassword, setLoginPassword] = useState('');
-    const [loginLoading, setLoginLoading] = useState(false);
+    const chatScriptLoadRef = useRef(null);
 
     /* ── Estados do formulário do cliente (carrinho) ────────────────
        Dados preenchidos pelo cliente no drawer do carrinho.
@@ -109,7 +93,11 @@ const App = () => {
     const [appliedCoupon, setAppliedCoupon] = useState(null);
     const [pixCopied, setPixCopied] = useState(false);
     const [orderObservations, setOrderObservations] = useState('');
-    const [feedbacks, setFeedbacks] = useState([]);
+    /* ── allOrders vazio — mantém compatibilidade com useSpecialClient
+       e useOrderTotal sem carregar a collection 'orders' na vitrine.
+       Pedidos são gerenciados exclusivamente pelo app-admin.js.
+       Fase 2 — Otimização de separação Vitrine × Admin. ───────────── */
+    const allOrders = [];
 
     /* ── normalizedCampaigns: Lista de campanhas normalizadas ────────
        Recebe: campaigns (bruto do Firebase)
@@ -176,33 +164,17 @@ const App = () => {
         }
     }, []);
 
-    /* ── Efeito: toggle classe CSS 'admin-active' no body ────────────
-       Quando isAdmin muda, adiciona/remove a classe no <body>.
-       Se admin ativo, rola a página para o topo (admin fica no topo). */
-    useEffect(() => {
-        if (typeof document === 'undefined') return undefined;
-
-        document.body.classList.toggle('admin-active', isAdmin);
-
-        if (isAdmin && typeof window !== 'undefined') {
-            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-        }
-
-        return () => {
-            document.body.classList.remove('admin-active');
-        };
-    }, [isAdmin]);
-
     /* ── Valores derivados do modo de operação ──────────────────────
        - todayStr: data de hoje formatada (YYYY-MM-DD)
        - siteMode: 'livre' (dia a dia) ou 'evento' (campanha com prazo)
        - dayToDayOperationDays/Hours: horário exibido no rodapé e carrinho
+       @update 2026-05-09 — Horário oficial do Dia a Dia atualizado para 14:30 às 20:00.
        - isDayToDayMode: true se modo livre (sem data/hora obrigatória)
        - effectiveDeliveryFee: taxa de entrega varia por modo */
-    const todayStr = useMemo(getTodayStr, []);
+    const todayStr = useMemo(() => normalizeDateOnlyValue(new Date()), []);
     const siteMode = siteSettings.siteMode || 'livre';
     const dayToDayOperationDays = 'Quarta a domingo';
-    const dayToDayOperationHours = '14:00hrs às 20hrs';
+    const dayToDayOperationHours = '14:30hrs às 20hrs';
     const isDayToDayMode = siteMode === 'livre';
     const effectiveDeliveryFee = isDayToDayMode ? DAY_TO_DAY_DELIVERY_FEE : DELIVERY_FEE;
 
@@ -251,6 +223,47 @@ const App = () => {
        handleCopyPix: copia a chave para a área de transferência.
        Tenta navigator.clipboard primeiro; fallback para document.execCommand. */
     const pixKey = siteSettings.chavePix || '88996549074';
+    const chatEnabled = siteSettingsLoaded && siteSettings.aiEnabled === true;
+
+    /**
+     * Carrega o script do chat sob demanda com proteção contra duplicidade.
+     *
+     * @returns {Promise<Function|null>} Componente do chat (window.HeloChatWidget) ou null
+     * @update 2026-05-09 — Implementa lazy toggle via site_settings.aiEnabled.
+     */
+    const loadChatWidgetScriptOnce = useCallback(() => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+            return Promise.resolve(null);
+        }
+        if (typeof window.HeloChatWidget === 'function') {
+            return Promise.resolve(window.HeloChatWidget);
+        }
+        if (chatScriptLoadRef.current) return chatScriptLoadRef.current;
+
+        chatScriptLoadRef.current = new Promise((resolve, reject) => {
+            const existingScript = document.querySelector('script[data-helo-chat-widget="true"]');
+            if (existingScript) {
+                existingScript.addEventListener('load', () => resolve(window.HeloChatWidget || null), { once: true });
+                existingScript.addEventListener('error', () => reject(new Error('Falha ao carregar script do chat.')), { once: true });
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.defer = true;
+            script.src = './js-build/components/chat-widget.component.js?v=20260509-050942';
+            script.dataset.heloChatWidget = 'true';
+            script.onload = () => resolve(window.HeloChatWidget || null);
+            script.onerror = () => reject(new Error('Falha ao carregar script do chat.'));
+            document.body.appendChild(script);
+        }).catch((error) => {
+            console.warn('[ChatWidget] Script lazy não pôde ser carregado:', error);
+            chatScriptLoadRef.current = null;
+            return null;
+        });
+
+        return chatScriptLoadRef.current;
+    }, []);
+
     const handleCopyPix = useCallback(async () => {
         try {
             if (navigator?.clipboard?.writeText) {
@@ -337,141 +350,34 @@ const App = () => {
         return maxCount > 0 ? new Set(topProducts) : new Set();
     }, [allOrders, productCatalogNameById]);
 
-    /* ── hasAdminClaim: Verifica se usuário tem claim de admin ──────
-       Recebe: candidateUser (Firebase User), forceRefresh (boolean)
-       Retorna: true se o token do usuário contém ADMIN_CLAIM_KEY = true
-       Usa getIdTokenResult para ler as custom claims do Firebase Auth. */
-    const hasAdminClaim = useCallback(async (candidateUser, forceRefresh = false) => {
-        if (!candidateUser || candidateUser.isAnonymous) return false;
-        try {
-            const tokenResult = await candidateUser.getIdTokenResult(forceRefresh);
-            return tokenResult?.claims?.[ADMIN_CLAIM_KEY] === true;
-        } catch {
-            return false;
-        }
-    }, [ADMIN_CLAIM_KEY]);
-
-    /* ── syncAdminClaimForUser: Sincroniza claim de admin via Cloud Function ──
-       Recebe: candidateUser (Firebase User)
-       Chama endpoint /api/admin/claim/sync (ou URL pública da Function)
-       com Bearer token. A Function verifica se o email está na lista
-       ADMIN_ALLOWED_EMAILS e, se sim, adiciona a custom claim.
-       Retorna: { ok: true } ou { ok: false, reason: string } */
-    const syncAdminClaimForUser = useCallback(async (candidateUser) => {
-        if (!candidateUser || candidateUser.isAnonymous) return { ok: false, reason: 'invalid_user' };
-
-        try {
-            const idToken = await candidateUser.getIdToken();
-            if (!idToken) return { ok: false, reason: 'missing_token' };
-
-            const endpointCandidates = [
-                '/api/admin/claim/sync',
-                'https://us-central1-helo-confeitaria.cloudfunctions.net/adminClaimApi/claim/sync',
-            ];
-
-            let lastReason = 'network_error';
-            for (const endpoint of endpointCandidates) {
-                try {
-                    const response = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: {
-                            Authorization: `Bearer ${idToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: '{}',
-                    });
-
-                    if (response.ok) {
-                        return { ok: true };
-                    }
-
-                    lastReason = `http_${response.status}`;
-
-                    // Em ambiente local sem rewrite, /api/... tende a 404.
-                    // Nessa situação, tentamos a URL pública da Cloud Function.
-                    if (response.status === 404) {
-                        continue;
-                    }
-                } catch {
-                    lastReason = 'network_error';
-                    continue;
-                }
-            }
-
-            return { ok: false, reason: lastReason };
-        } catch {
-            return { ok: false, reason: 'network_error' };
-        }
-    }, []);
-
-    /* ── awaitAdminClaimPropagation: Aguarda propagação da claim admin ──
-       Recebe: candidateUser (Firebase User)
-       Faz até 6 tentativas com delay crescente (500ms * attempt)
-       para verificar se a claim admin já propagou no token.
-       Retorna: true se a claim foi detectada, false se esgotou tentativas */
-    const awaitAdminClaimPropagation = useCallback(async (candidateUser) => {
-        for (let attempt = 0; attempt < 6; attempt += 1) {
-            if (attempt > 0) {
-                await new Promise((resolve) => window.setTimeout(resolve, 500 * attempt));
-            }
-            const hasClaim = await hasAdminClaim(candidateUser, true);
-            if (hasClaim) return true;
-        }
-        return false;
-    }, [hasAdminClaim]);
-
     /* ════════════════════════════════════════════════════════════════
        EFEITO: Auth Listener — Monitora estado de autenticação
        ════════════════════════════════════════════════════════════════
        Quando o Firebase Auth muda de estado:
        - Se não há usuário (u === null): faz signInAnonymously()
-       - Se há usuário: verifica se tem claim admin (hasAdminClaim)
-       - Atualiza estados user e isAdmin conforme resultado
-       Retorna função de unsubscribe para limpar o listener. */
+       - Se há usuário: apenas seta o user (não verifica admin na vitrine)
+
+       NOTA (Fase 2 — Otimização): a verificação de claim admin e o
+       redirecionamento para o painel foram removidos da vitrine.
+       O login admin agora é feito exclusivamente via admin.html,
+       que carrega app-admin.js com sua própria lógica de autenticação.
+       ════════════════════════════════════════════════════════════════ */
     useEffect(() => {
-        let active = true;
-        const unsub = auth.onAuthStateChanged(async u => {
-            if (!active) return;
-
-            if (!u) {
-                setUser(null);
-                setIsAdmin(false);
-                /* ── Retry com backoff para signInAnonymously ────────────
-                   Em mobile, a primeira tentativa pode falhar por rede
-                   instável, ITP do Safari ou throttling do Firebase Auth.
-                   Tenta até 3 vezes com delay crescente (1s, 2s, 3s). */
-                for (let tentativa = 0; tentativa < 3; tentativa++) {
-                    try {
-                        await auth.signInAnonymously();
-                        break; // Sucesso — sai do loop
-                    } catch (err) {
-                        console.warn(`[Auth] signInAnonymously falhou (tentativa ${tentativa + 1}/3):`, err?.message || err);
-                        if (tentativa < 2) await new Promise(r => setTimeout(r, 1000 * (tentativa + 1)));
-                    }
+        let unsub = () => {};
+        try {
+            unsub = auth.onAuthStateChanged(async (u) => {
+                if (!u) {
+                    setUser(null);
+                    try { await auth.signInAnonymously(); } catch (_) {}
+                    return;
                 }
-                return;
-            }
-
-            setUser(u);
-
-            /* ── Se handleEmailLogin está em andamento, NÃO verificar claim ──
-               handleEmailLogin sincroniza a claim (syncAdminClaimForUser +
-               awaitAdminClaimPropagation) e seta isAdmin=true manualmente
-               APÓS a propagação. Se verificarmos aqui, a claim ainda não
-               propagou → setIsAdmin(false) → flash de Vitrine → travada.
-               O ref permite que onAuthStateChanged apenas sete o user,
-               adiando a decisão de isAdmin para handleEmailLogin. */
-            if (loginInProgressRef.current) return;
-
-            const isAllowedAdmin = await hasAdminClaim(u, true);
-            if (!active) return;
-            setIsAdmin(isAllowedAdmin);
-        });
-        return () => {
-            active = false;
-            unsub();
-        };
-    }, [hasAdminClaim]);
+                setUser(u);
+            });
+        } catch (e) {
+            console.error('[Auth] Erro ao iniciar listener:', e);
+        }
+        return () => { try { unsub(); } catch (_) {} };
+    }, []);
 
     /* ── Efeito: Diagnóstico de Quirks Mode ─────────────────────────
        Verifica se o navegador entrou em Quirks Mode (compatibilidade
@@ -691,119 +597,6 @@ const App = () => {
     }, [user]);
 
     /* ════════════════════════════════════════════════════════════════
-       EFEITO: Migração de campanhas v1 (roda apenas se admin)
-       ════════════════════════════════════════════════════════════════
-       Executa uma vez: cria documentos GERAL e LEGADO na collection
-       'campanhas' e adiciona campaignId em pedidos/produtos/financeiro
-       que ainda não tinham (legacy data). Usa batch writes em chunks
-       de 400 (limite do Firestore). Marca 'done: true' ao finalizar. */
-    useEffect(() => {
-        if (!isAdmin) return;
-
-        let cancelled = false;
-
-        const runCampaignMigration = async () => {
-            try {
-                /* ── Testa conectividade com Firestore antes de migrar ──
-                   Se o Firestore estiver offline (ex: desenvolvimento local,
-                   rede restrita), a migração falha e polui o console.
-                   Fazemos uma leitura leve para verificar se estamos online. */
-                const migrationRef = getMetaDoc('campaigns_migration_v1');
-                let migrationSnap;
-                try {
-                    migrationSnap = await migrationRef.get();
-                } catch (connErr) {
-                    /* Offline ou sem conectividade — aborta silenciosamente.
-                       A migração rodará na próxima sessão admin com conexão.
-                       Loga como warn para admin saber que está offline. */
-                    const msg = (connErr?.message || '').toLowerCase();
-                    if (msg.includes('offline') || msg.includes('network') || msg.includes('unavailable') || msg.includes('failed to get')) {
-                        console.warn('[Migração] Firestore indisponível — migração de campanhas será tentada na próxima sessão com conexão.');
-                        return;
-                    }
-                    throw connErr; /* re-lança erros inesperados */
-                }
-                if (migrationSnap.exists && migrationSnap.data()?.done === true) return;
-
-                const campaignGeneralRef = getCol('campanhas').doc(CAMPAIGN_GENERAL_ID);
-                const campaignLegacyRef = getCol('campanhas').doc(CAMPAIGN_LEGACY_ID);
-
-                await campaignGeneralRef.set({
-                    nome: CAMPAIGN_GENERAL_NAME,
-                    status: 'ativo',
-                    autoEnabled: false,
-                    startDate: '',
-                    endDate: '',
-                    priority: 0,
-                    data_criacao: firebase.firestore.FieldValue.serverTimestamp(),
-                }, { merge: true });
-
-                await campaignLegacyRef.set({
-                    nome: CAMPAIGN_DEFAULT_NAME,
-                    status: 'inativo',
-                    autoEnabled: false,
-                    startDate: '',
-                    endDate: '',
-                    priority: -1,
-                    data_criacao: firebase.firestore.FieldValue.serverTimestamp(),
-                }, { merge: true });
-
-                const [ordersSnap, productsSnap, financeSnap] = await Promise.all([
-                    getCol('orders').get(),
-                    getCol('products').get(),
-                    getCol('financeiro').get(),
-                ]);
-
-                const pendingUpdates = [];
-
-                ordersSnap.docs.forEach((docSnap) => {
-                    const data = docSnap.data() || {};
-                    if (safeText(data.campaignId).trim()) return;
-                    pendingUpdates.push({ ref: docSnap.ref, payload: { campaignId: CAMPAIGN_LEGACY_ID } });
-                });
-
-                productsSnap.docs.forEach((docSnap) => {
-                    const data = docSnap.data() || {};
-                    if (safeText(data.campaignId).trim()) return;
-                    pendingUpdates.push({ ref: docSnap.ref, payload: { campaignId: CAMPAIGN_LEGACY_ID } });
-                });
-
-                financeSnap.docs.forEach((docSnap) => {
-                    const data = docSnap.data() || {};
-                    if (safeText(data.campaignId).trim()) return;
-                    pendingUpdates.push({ ref: docSnap.ref, payload: { campaignId: CAMPAIGN_LEGACY_ID } });
-                });
-
-                for (let i = 0; i < pendingUpdates.length; i += 400) {
-                    const chunk = pendingUpdates.slice(i, i + 400);
-                    const batch = db.batch();
-                    chunk.forEach(item => batch.update(item.ref, item.payload));
-                    await batch.commit();
-                }
-
-                await migrationRef.set({
-                    done: true,
-                    version: 1,
-                    updatedItems: pendingUpdates.length,
-                    doneAt: firebase.firestore.FieldValue.serverTimestamp(),
-                }, { merge: true });
-            } catch (error) {
-                if (cancelled) return;
-                const msg = (error?.message || '').toLowerCase();
-                /* Permissão negada — silencia pois o gate isAdmin já protege */
-                if (isFirestorePermissionDenied(error)) return;
-                /* Qualquer outro erro (incluindo offline) — loga para admin */
-                console.error('Erro ao executar migração de campanhas:', error);
-            }
-        };
-
-        runCampaignMigration();
-        return () => {
-            cancelled = true;
-        };
-    }, [isAdmin]);
-
-    /* ════════════════════════════════════════════════════════════════
        EFEITO: Listeners Firestore — DADOS PÚBLICOS (sem autenticação)
        ════════════════════════════════════════════════════════════════
        Estes listeners NÃO dependem de `user`. São dados públicos que
@@ -862,6 +655,8 @@ const App = () => {
                 } catch (mapErr) {
                     console.error('[Firestore] Erro ao mapear documentos de produtos:', mapErr);
                 }
+                setDbError(null);
+                setLoadingHint('');
                 setCatalogLoaded(true);
             },
             err => {
@@ -876,10 +671,12 @@ const App = () => {
                     /* Erro de permissão — esperado durante logout/login.
                        Não seta dbError pois o listener reconecta automaticamente
                        assim que o novo usuário autentica. */
+                    setLoadingHint('Conexao lenta detectada. Tentando reconectar o catalogo...');
                     setCatalogLoaded(true);
                     return;
                 }
-                if (!isAdminRef.current && (errMsg.includes('offline') || errMsg.includes('network') || errMsg.includes('unavailable'))) {
+                if (errMsg.includes('offline') || errMsg.includes('network') || errMsg.includes('unavailable')) {
+                    setLoadingHint('Conexao instavel no momento. O catalogo pode levar mais tempo para aparecer.');
                     setCatalogLoaded(true);
                     return;
                 }
@@ -901,15 +698,19 @@ const App = () => {
                     } catch (mapErr2) {
                         console.error('[Firestore] Erro ao mapear produtos (fallback get):', mapErr2);
                     }
+                    setDbError(null);
+                    setLoadingHint('');
                     setCatalogLoaded(true);
                 }).catch(getErr => {
                     const getErrMsg = (getErr?.message || '').toLowerCase();
                     /* Silencia erros de permissão e offline para visitantes */
                     if (getErrMsg.includes('permission') || getErrMsg.includes('insufficient')) {
+                        setLoadingHint('Conexao lenta detectada. Tentando reconectar o catalogo...');
                         setCatalogLoaded(true);
                         return;
                     }
-                    if (!isAdminRef.current && (getErrMsg.includes('offline') || getErrMsg.includes('network') || getErrMsg.includes('unavailable'))) {
+                    if (getErrMsg.includes('offline') || getErrMsg.includes('network') || getErrMsg.includes('unavailable')) {
+                        setLoadingHint('Conexao instavel no momento. O catalogo pode levar mais tempo para aparecer.');
                         setCatalogLoaded(true);
                         return;
                     }
@@ -926,7 +727,7 @@ const App = () => {
            Após 8 segundos sem resposta, fazemos uma leitura única. */
         const fallbackTimer = setTimeout(() => {
             if (snapshotFired) return;
-            console.warn('[Firestore] onSnapshot de produtos não disparou em 8s. Tentando fallback get()...');
+            console.warn('[Firestore] onSnapshot de produtos não disparou em 12s. Tentando fallback get()...');
             getCol('products').get().then(snap => {
                 if (snapshotFired) return; // onSnapshot chegou primeiro
                 snapshotFired = true;
@@ -947,8 +748,8 @@ const App = () => {
                 setCatalogLoaded(true);
             }).catch(getErr => {
                 const fbMsg = (getErr?.message || '').toLowerCase();
-                /* Silencia offline apenas para visitantes; admin precisa ver */
-                if (!isAdminRef.current && (fbMsg.includes('offline') || fbMsg.includes('network') || fbMsg.includes('unavailable'))) {
+                /* Silencia offline para visitantes */
+                if (fbMsg.includes('offline') || fbMsg.includes('network') || fbMsg.includes('unavailable')) {
                     if (!snapshotFired) setCatalogLoaded(true);
                     return;
                 }
@@ -979,7 +780,7 @@ const App = () => {
         const silenciarPermissao = (nome) => (err) => {
             const msg = (err?.message || '').toLowerCase();
             if (msg.includes('permission') || msg.includes('insufficient')) return; /* esperado para visitantes */
-            if (!isAdminRef.current && (msg.includes('offline') || msg.includes('network') || msg.includes('unavailable') || msg.includes('failed to get'))) return; /* silencia offline só para visitantes */
+            if (msg.includes('offline') || msg.includes('network') || msg.includes('unavailable') || msg.includes('failed to get')) return; /* silencia offline para visitantes */
             console.error(`[Firestore] Erro no listener de ${nome}:`, err);
         };
 
@@ -991,7 +792,10 @@ const App = () => {
 
         /* ── site_settings: onSnapshot (precisa de real-time para mudanças de modo) ── */
         unsubs.push(getMetaDoc('site_settings').onSnapshot(
-            doc => { if (doc.exists) setSiteSettings(prev => ({ ...prev, ...doc.data() })); },
+            doc => {
+                if (doc.exists) setSiteSettings(prev => ({ ...prev, ...doc.data() }));
+                setSiteSettingsLoaded(true);
+            },
             silenciarPermissao('site_settings')
         ));
 
@@ -1002,20 +806,13 @@ const App = () => {
             setAllCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         }).catch(err => {
             const msg = (err?.message || '').toLowerCase();
-            if (!isAdminRef.current && (msg.includes('permission') || msg.includes('offline') || msg.includes('network') || msg.includes('unavailable'))) return;
+            if (msg.includes('permission') || msg.includes('offline') || msg.includes('network') || msg.includes('unavailable')) return;
             console.warn('[Firestore] Falha ao carregar cupons (get):', err.message || err);
         });
 
-        /* ── visits: get() (contador legado, não precisa de real-time) ──
-           Carrega uma vez. O AdminPanel tem seu próprio listener para
-           o painel de análise de tráfego. */
-        getMetaDoc('visits').get().then(doc => {
-            if (doc.exists) setVisitsData(doc.data());
-        }).catch(err => {
-            const msg = (err?.message || '').toLowerCase();
-            if (!isAdminRef.current && (msg.includes('permission') || msg.includes('offline') || msg.includes('network') || msg.includes('unavailable'))) return;
-            console.warn('[Firestore] Falha ao carregar visits (get):', err.message || err);
-        });
+        /* ── visits: get() removido da vitrine (Fase 2 — Otimização).
+           O contador de visitas agora é gerenciado exclusivamente
+           pelo app-admin.js no painel administrativo. */
 
         return () => {
             clearTimeout(fallbackTimer);
@@ -1024,128 +821,57 @@ const App = () => {
     }, []); /* ← Sem dependências! Roda no mount, independente de auth */
 
     /* ════════════════════════════════════════════════════════════════
-       EFEITO: Listeners Firestore — DADOS SENSÍVEIS (somente ADMIN)
-       ════════════════════════════════════════════════════════════════
-       Estes listeners acessam coleções protegidas por regras Firestore
-       que EXIGEM permissão de administrador (isAdmin):
-
-       - orders: pedidos (requer isAdmin ou isOrderOwner)
-       - financeiro: lançamentos financeiros (requer isAdmin)
-       - ingredients, recipes, feedbacks: requerem isAdmin
-       - coupons: atualização em tempo real para o painel admin
-
-       IMPORTANTE: Todos os visitantes recebem auth anônimo (user != null),
-       mas NÃO são admin. Por isso o gate correto é `isAdmin`, não `user`.
-       Se usássemos apenas `if (!user) return`, visitantes anônimos
-       tentariam acessar coleções protegidas → erros de permissão.
-
-       Se NÃO for admin, marcamos ordersLoaded=true para não travar UI. */
-    useEffect(() => {
-        if (!isAdmin) {
-            /* Visitante público: não iniciar listeners sensíveis.
-               Marca ordersLoaded para evitar skeleton infinito. */
-            setOrdersLoaded(true);
-            return;
-        }
-        const unsubs = [];
-
-        /* ── Escalonamento de listeners admin (stagger) ────────────
-           Em vez de iniciar 6 onSnapshot simultaneamente (pico de
-           conexões + processamento), escalonamos com requestAnimationFrame
-           para distribuir a carga entre frames do navegador.
-           Isso evita o "congelamento" inicial ao entrar no painel admin,
-           especialmente em dispositivos móveis onde 6 listeners
-           simultâneos + montagem do AdminPanel causam jank visível. */
-
-        /* ── Listener de pedidos (admin only) — PRIORIDADE ALTA ────
-           Inicia imediatamente pois é a aba padrão do admin.
-           Garante ordersLoaded=true mesmo em caso de erro de rede. */
-        unsubs.push(getCol('orders').orderBy('createdAt', 'desc').onSnapshot(
-            snap => {
-                setAllOrders(snap.docs.map(d => ({ id: d.id, ...d.data(), campaignId: normalizeCampaignId(d.data()?.campaignId, CAMPAIGN_LEGACY_ID) })));
-                setOrdersLoaded(true);
-            },
-            err => {
-                console.error('[Firestore] Erro no listener de pedidos (onSnapshot):', err);
-                setOrdersLoaded(true);
-            }
-        ));
-
-        /* ── Listeners de prioridade média — iniciam no próximo frame ──
-           financeiro e coupons são necessários mas não bloqueiam a UX. */
-        requestAnimationFrame(() => {
-            if (!isAdminRef.current) return; // Admin já saiu — não iniciar
-
-            /* ── Listener de financeiro (admin only) ─────────────────── */
-            unsubs.push(getCol('financeiro').onSnapshot(
-                snap => setFinancialEntries(snap.docs.map(d => ({ id: d.id, ...d.data(), campaignId: normalizeCampaignId(d.data()?.campaignId, CAMPAIGN_LEGACY_ID) }))),
-                err => console.error('[Firestore] Erro no listener de financeiro:', err)
-            ));
-
-            /* ── Coupons: onSnapshot para admin (real-time no painel) ──
-               O get() público já carregou cupons inicialmente para o checkout.
-               Este listener mantém a lista atualizada quando admin cria/desativa. */
-            unsubs.push(getCol('coupons').onSnapshot(
-                snap => setAllCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                err => console.error('[Firestore] Erro no listener de coupons:', err)
-            ));
-        });
-
-        /* ── Listeners de baixa prioridade — iniciam após 2 frames ──
-           ingredients, recipes e feedbacks só são usados em abas
-           específicas (Estoque/Feedbacks) e podem carregar depois. */
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (!isAdminRef.current) return; // Admin já saiu — não iniciar
-
-                /* ── Listeners de ingredientes, receitas e feedbacks (admin only) ── */
-                unsubs.push(getCol('ingredients').onSnapshot(
-                    snap => setIngredients(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    err => console.error('[Firestore] Erro no listener de ingredients:', err)
-                ));
-                unsubs.push(getCol('recipes').onSnapshot(
-                    snap => setRecipes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    err => console.error('[Firestore] Erro no listener de recipes:', err)
-                ));
-                unsubs.push(getCol('feedbacks').onSnapshot(
-                    snap => setFeedbacks(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    err => console.error('[Firestore] Erro no listener de feedbacks:', err)
-                ));
-            });
-        });
-
-        return () => unsubs.forEach(unsub => typeof unsub === 'function' && unsub());
-    }, [isAdmin]);
-
-    /* ════════════════════════════════════════════════════════════════
        EFEITO: Timeout de segurança para skeleton infinito (mobile)
        ════════════════════════════════════════════════════════════════
-       Último recurso: se após 10 segundos o catálogo OU os pedidos
-       ainda não carregaram (tudo falhou, inclusive o fallback get()),
-       marcamos como carregado para remover o skeleton e exibir
-       "Nenhum item disponível" em vez de loading infinito.
+       Último recurso: se após 15 segundos o catálogo ainda não carregou
+       (tudo falhou, inclusive o fallback get()), marcamos como carregado
+       para remover o skeleton e exibir "Nenhum item disponível" em vez
+       de loading infinito.
 
        Com a separação dos listeners públicos (sem depender de auth),
        este timeout só deve disparar em casos extremos de Firestore
        completamente indisponível.
+
+       NOTA (Fase 2 — Otimização): o timeout de pedidos foi removido pois
+       a vitrine pública não carrega mais a collection 'orders'. Pedidos
+       são gerenciados exclusivamente pelo app-admin.js.
        ════════════════════════════════════════════════════════════════ */
     useEffect(() => {
         if (catalogLoaded) return;
+        const slowHintTimer = setTimeout(() => {
+            setLoadingHint('Conexao lenta detectada. Ainda estamos carregando o catalogo para voce.');
+        }, 6000);
         const timer = setTimeout(() => {
-            console.warn('[App] Timeout de segurança: catálogo não carregou em 10s. Removendo skeleton.');
+            console.warn('[App] Timeout de segurança: catálogo não carregou em 15s. Removendo skeleton.');
+            setDbError(prev => prev || 'Conexao instavel. Nao foi possivel carregar tudo no tempo esperado. Tente atualizar a pagina.');
             setCatalogLoaded(true);
-        }, 10000);
-        return () => clearTimeout(timer);
+        }, 15000);
+        return () => {
+            clearTimeout(slowHintTimer);
+            clearTimeout(timer);
+        };
     }, [catalogLoaded]);
 
+    /**
+     * Monta/desmonta o chat com base na flag aiEnabled já carregada.
+     *
+     * Enquanto site_settings não confirmar a flag, o chat fica desativado.
+     */
     useEffect(() => {
-        if (ordersLoaded) return;
-        const timer = setTimeout(() => {
-            console.warn('[App] Timeout de segurança: pedidos não carregaram em 10s.');
-            setOrdersLoaded(true);
-        }, 10000);
-        return () => clearTimeout(timer);
-    }, [ordersLoaded]);
+        let isCancelled = false;
+
+        if (!chatEnabled) {
+            setChatWidgetComponent(null);
+            return () => { isCancelled = true; };
+        }
+
+        loadChatWidgetScriptOnce().then((component) => {
+            if (isCancelled) return;
+            setChatWidgetComponent(() => (typeof component === 'function' ? component : null));
+        });
+
+        return () => { isCancelled = true; };
+    }, [chatEnabled, loadChatWidgetScriptOnce]);
 
     /* ── handleAddToCart: Adiciona produto ao carrinho com validação ──
        Recebe: produto (p) com id, name, price, stockLimit
@@ -1250,7 +976,7 @@ const App = () => {
         }
 
         const now = new Date();
-        const nowDate = normalizeDateOnlyValue(now, getTodayStr());
+        const nowDate = normalizeDateOnlyValue(now, todayStr);
         const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         const hasDateTime = !isDayToDayMode && Boolean(orderDate && orderTime);
 
@@ -1378,81 +1104,6 @@ const App = () => {
         setSuccessData(waUrl); resetForm(); setIsSaving(false);
     }, [customerPhone, customerName, orderDate, orderTime, deliveryMethod, street, neighborhood, paymentMethod, reference, cart, subtotal, discountValue, appliedCoupon, specialApplied, finalDelivery, total, todayStr, resetForm, installmentQty, installmentAmount, installmentRate, cardFeeValue, payableTotal, orderObservations, activeCampaign.id, isDayToDayMode, cashChangeFor, pixKey, products]);
 
-    /* ── saveSettings: Salva configurações do site no Firebase ──────
-       Recebe: objeto de configurações
-       Usa set com merge: true no documento 'site_settings' */
-    const saveSettings = useCallback(async (settings) => {
-        await getMetaDoc('site_settings').set(settings, { merge: true });
-    }, []);
-
-    /* ════════════════════════════════════════════════════════════════
-       handleEmailLogin: Login de administrador via email/senha
-       ════════════════════════════════════════════════════════════════
-       Fluxo:
-       1. Autentica via signInWithEmailAndPassword
-       2. Verifica se tem claim admin (hasAdminClaim)
-       3. Se não tem, tenta sincronizar (syncAdminClaimForUser)
-       4. Aguarda propagação da claim (awaitAdminClaimPropagation)
-       5. Se ainda não tem, desloga e alerta erro
-       6. Se sucesso, atualiza user e isAdmin, fecha modal
-       Trata erros comuns: user-not-found, wrong-password, too-many-requests */
-    const handleEmailLogin = useCallback(async () => {
-        if (!loginEmail || !loginPassword) return;
-        setLoginLoading(true);
-        /* ── Sinaliza login em progresso para onAuthStateChanged ────
-           Impede que o auth listener faça setIsAdmin(false) enquanto
-           a claim admin ainda está sendo sincronizada/propagada.
-           Sem isso, onAuthStateChanged detecta claim ausente e seta
-           isAdmin=false → flash de Vitrine → montagem pesada. */
-        loginInProgressRef.current = true;
-        try {
-            const normalizedEmail = safeText(loginEmail).trim().toLowerCase();
-            const credential = await auth.signInWithEmailAndPassword(normalizedEmail, loginPassword);
-            let isAllowed = await hasAdminClaim(credential.user, true);
-
-            if (!isAllowed) {
-                const syncResult = await syncAdminClaimForUser(credential.user);
-                if (syncResult.ok) {
-                    isAllowed = await awaitAdminClaimPropagation(credential.user);
-                }
-            }
-
-            if (!isAllowed) {
-                loginInProgressRef.current = false;
-                await auth.signOut();
-                alert('Usuário autenticado, porém sem privilégio admin. Verifique ADMIN_ALLOWED_EMAILS no backend e redeploy das functions.');
-                return;
-            }
-
-            try {
-                await credential.user.getIdToken(true);
-            } catch (_) {
-                // segue mesmo se o refresh falhar aqui
-            }
-
-            /* ── onAuthStateChanged já setou o user via o listener ────
-               Não chamamos setUser(credential.user) para evitar
-               render duplicado (onAuthStateChanged já fez isso).
-               Apenas setamos isAdmin=true APÓS a claim estar propagada
-               e liberamos o flag para o auth listener voltar ao normal. */
-            setIsAdmin(true);
-            loginInProgressRef.current = false;
-            setShowLoginModal(false);
-            setLoginEmail('');
-            setLoginPassword('');
-        } catch (err) {
-            loginInProgressRef.current = false;
-            let message = 'Não foi possível entrar. Confira o e-mail e a senha.';
-            if (err.code === 'auth/user-not-found') message = 'E-mail não encontrado.';
-            if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') message = 'Senha incorreta.';
-            if (err.code === 'auth/invalid-email') message = 'Digite um e-mail válido.';
-            if (err.code === 'auth/too-many-requests') message = 'Muitas tentativas. Aguarde alguns instantes e tente novamente.';
-            alert(message);
-        } finally {
-            setLoginLoading(false);
-        }
-    }, [loginEmail, loginPassword, hasAdminClaim, syncAdminClaimForUser, awaitAdminClaimPropagation]);
-
     /* ── Estilos reutilizáveis para inputs e botões de método ────────
        inp: estilo base para campos de texto do formulário
        btnMethod: função que retorna estilo para botão BUSCAR/ENTREGA,
@@ -1463,11 +1114,20 @@ const App = () => {
     /* ════════════════════════════════════════════════════════════════
        RENDERIZAÇÃO CONDICIONAL
        ════════════════════════════════════════════════════════════════
-       1. Se ?feedback= na URL → Componente FeedbackExperience
-       2. Se isAdmin → Componente AreaAdministrativa (painel admin)
-       3. Senão → Vitrine pública com carrinho, hero e rodapé */
-    if (feedbackOrderId) return <FeedbackExperience orderId={feedbackOrderId} onBack={() => window.location.href = window.location.href.split('?')[0].split('#')[0]} />;
-    if (isAdmin) return <AreaAdministrativa allOrders={allOrders} allCoupons={allCoupons} products={products} visitsData={visitsData} ingredients={ingredients} recipes={recipes} feedbacks={feedbacks} financialEntries={financialEntries} campaigns={normalizedCampaigns} activeCampaignId={activeCampaign.id} onExitAdmin={async () => { /* ── Logout otimizado: signOut() dispara onAuthStateChanged(null) que seta setUser(null) + setIsAdmin(false) em batch natural. Antes fazíamos setIsAdmin(false) manual ANTES do signOut, causando 2 renders: 1) AdminPanel desmonta + Vitrine monta, 2) onAuthStateChanged seta user=null + signInAnonymously → user=anonymous. Com esta mudança, a transição inteira acontece em 1 ciclo de render após signOut resolver. */ await auth.signOut(); }} siteSettings={siteSettings} onSaveSettings={saveSettings} />;
+       1. Se ?feedback= na URL → FeedbackExperience (se disponível)
+       2. Senão → Vitrine pública com carrinho, hero e rodapé
+
+       NOTA (Fase 2 — Otimização): o painel administrativo foi removido
+       da vitrine. Admin agora acessa exclusivamente via admin.html,
+       que carrega app-admin.js como entrypoint isolado.
+       ════════════════════════════════════════════════════════════════ */
+    if (feedbackOrderId) {
+        if (typeof window !== 'undefined' && typeof window.FeedbackExperience !== 'undefined') {
+            const FExp = window.FeedbackExperience;
+            return <FExp orderId={feedbackOrderId} onBack={() => window.location.href = window.location.href.split('?')[0].split('#')[0]} />;
+        }
+        return <div style={{ padding: '5rem', textAlign: 'center' }}>Carregando área de feedback...</div>;
+    }
 
     /* ════════════════════════════════════════════════════════════════
        JSX — Vitrine pública (layout principal)
@@ -1480,8 +1140,10 @@ const App = () => {
        5. VitrineProdutos: grid de produtos com filtros e escassez
        6. CarrinhoCompras: drawer lateral com formulário completo
        7. Modal de sucesso (após pedido salvo)
-       8. RodapeSite: rodapé com horário e link admin
-       9. ModalAcessoReservado: modal de login admin */
+       8. RodapeSite: rodapé com horário e link para admin.html
+
+       NOTA (Fase 2 — Otimização): ModalAcessoReservado removido.
+       Login admin agora é feito diretamente em admin.html. */
     return (
         <>
             <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }} className="main-content">
@@ -1490,6 +1152,12 @@ const App = () => {
                 {dbError && (
                     <div style={{ position: 'fixed', top: '5rem', left: 0, right: 0, zIndex: 40, background: '#fefce8', borderBottom: '1px solid #fef08a', color: '#854d0e', fontSize: '12px', textAlign: 'center', padding: '8px 16px', fontWeight: '500' }}>
                         <i className="ph-bold ph-warning" style={{ marginRight: '4px' }}></i>{dbError}
+                    </div>
+                )}
+
+                {!dbError && loadingHint && (
+                    <div style={{ position: 'fixed', top: '5rem', left: 0, right: 0, zIndex: 39, background: '#eff6ff', borderBottom: '1px solid #bfdbfe', color: '#1e3a8a', fontSize: '12px', textAlign: 'center', padding: '8px 16px', fontWeight: '500' }}>
+                        <i className="ph-bold ph-clock-countdown" style={{ marginRight: '4px' }}></i>{loadingHint}
                     </div>
                 )}
 
@@ -1508,7 +1176,6 @@ const App = () => {
                     enableScarcityBanner={enableScarcityBanner}
                     deadlinePassed={deadlinePassed}
                     deadlineLabelBanner={deadlineLabelBanner}
-                    ordersLoaded={ordersLoaded}
                     catalogLoaded={catalogLoaded}
                     remainingUnits={remainingUnits}
                     progressPercent={progressPercent}
@@ -1517,6 +1184,16 @@ const App = () => {
                     filteredProducts={filteredProducts}
                     onAddToCart={handleAddToCart}
                     bestSellerNames={bestSellerNames}
+                    buildMenuTabOptions={buildMenuTabOptions}
+                    dedupeProductsByIdentity={dedupeProductsByIdentity}
+                    normalizeProductForMenu={normalizeProductForMenu}
+                    resolveProductMenuTab={resolveProductMenuTab}
+                    getMenuTabLabel={getMenuTabLabel}
+                    normalizeProductImages={normalizeProductImages}
+                    installmentText={installmentText}
+                    fmtBRL={fmtBRL}
+                    ProductCard={ProductCard}
+                    ProdutoModal={typeof ProdutoModal !== 'undefined' ? ProdutoModal : null}
                 />
 
                 <CarrinhoCompras
@@ -1575,6 +1252,7 @@ const App = () => {
                     installmentAmount={installmentAmount}
                     saveAndSend={saveAndSend}
                     fmtBRL={fmtBRL}
+                    installmentText={installmentText}
                     CARD_INSTALLMENT_RATES={CARD_INSTALLMENT_RATES}
                     DELIVERY_FEE={effectiveDeliveryFee}
                     isDayToDayMode={isDayToDayMode}
@@ -1599,22 +1277,12 @@ const App = () => {
                 )}
 
                 <RodapeSite
-                    onOpenLogin={() => setShowLoginModal(true)}
+                    onOpenLogin={() => { window.location.href = '/admin.html'; }}
                     operationDays={dayToDayOperationDays}
                     operationHours={dayToDayOperationHours}
                 />
+                {chatWidgetComponent ? React.createElement(chatWidgetComponent) : null}
             </div>
-
-            <ModalAcessoReservado
-                open={showLoginModal}
-                loginEmail={loginEmail}
-                loginPassword={loginPassword}
-                loginLoading={loginLoading}
-                onLoginEmailChange={setLoginEmail}
-                onLoginPasswordChange={setLoginPassword}
-                onSubmit={handleEmailLogin}
-                onClose={() => { setShowLoginModal(false); setLoginEmail(''); setLoginPassword(''); }}
-            />
         </>
     );
 };
@@ -1624,4 +1292,3 @@ const App = () => {
    Usa ReactDOM.createRoot (React 18+) para renderização concorrente. */
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
-

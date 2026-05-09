@@ -14,7 +14,7 @@
    Expõe o hook useInventoryDomain que centraliza todo o estado e lógica.
    ═══════════════════════════════════════════════════════════════════════ */
 window.HeloInventory = (() => {
-	const { useState, useEffect, useMemo, useCallback } = React;
+	/* React hooks injetados globalmente via core-globals.js */
 	const { db, getCol, getMetaDoc } = window.HeloApp;
 
 	/* ══════════════════════════════════════════════════════════════════

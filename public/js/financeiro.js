@@ -18,7 +18,7 @@
    Expõe o hook useFinanceDomain que centraliza todo o estado e lógica.
    ═══════════════════════════════════════════════════════════════════════ */
 window.HeloFinance = (() => {
-	const { useState, useEffect, useMemo, useCallback } = React;
+	/* React hooks injetados globalmente via core-globals.js */
 
 	/* ── Importa utilitários dos módulos centrais ────────────────────── */
 	const {

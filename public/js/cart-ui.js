@@ -47,6 +47,36 @@
    6. Painel de resumo (subtotal, desconto, frete, taxa cartão, total)
    7. Botão FINALIZAR PEDIDO (com loader se salvando)
    ═══════════════════════════════════════════════════════════════════════ */
+const formatCartCurrency = (value, fmtBRL) => {
+    const numericValue = Number(value) || 0;
+    if (typeof fmtBRL === 'function') return fmtBRL(numericValue);
+    return numericValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const CartItem = React.memo(({ item, onQty, fmtBRL, installmentText }) => {
+    const itemTotal = Number(item.price) * Number(item.qty);
+    const installmentInfo = typeof installmentText === 'function'
+        ? installmentText(item.price, item.installment)
+        : null;
+
+    return (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '1rem', borderRadius: '1rem', border: '1px solid #f1f5f9' }}>
+            <div style={{ flex: 1 }}>
+                <span style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '14px', display: 'block' }}>{item.qty}x {item.name}</span>
+                <div style={{ color: 'var(--gold)', fontSize: '14px', fontWeight: '900', marginTop: '4px' }}>R$ {formatCartCurrency(itemTotal, fmtBRL)}</div>
+                {installmentInfo && (
+                    <div style={{ marginTop: '6px', fontSize: '11px', fontWeight: '700', color: '#166534', background: '#ecfdf3', border: '1px solid #bbf7d0', display: 'inline-block', padding: '4px 8px', borderRadius: '9999px' }}>Ate 3x: {installmentInfo}</div>
+                )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '6px 8px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <button onClick={() => onQty(item.id, -1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px', lineHeight: 1 }}><i className="ph-bold ph-minus"></i></button>
+                <span style={{ fontWeight: '700', fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{item.qty}</span>
+                <button onClick={() => onQty(item.id, 1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px', lineHeight: 1 }}><i className="ph-bold ph-plus"></i></button>
+            </div>
+        </div>
+    );
+});
+
 const CarrinhoCompras = React.memo(({
     open,
     isSaving,
@@ -102,6 +132,7 @@ const CarrinhoCompras = React.memo(({
     installmentAmount,
     saveAndSend,
     fmtBRL,
+    installmentText,
     CARD_INSTALLMENT_RATES,
     DELIVERY_FEE,
     isDayToDayMode,
@@ -110,9 +141,6 @@ const CarrinhoCompras = React.memo(({
     isDeliveryAvailable = true,
     nomeTitularPix = '',
 }) => {
-    /* ── Se o drawer não está aberto, não renderiza nada ──────────── */
-    if (!open) return null;
-
     /* ── Efeito: força retirada se entrega estiver desativada pelo admin ──
        Quando isDeliveryAvailable muda para false e o cliente estava
        com "entrega" selecionado, automaticamente muda para "retirada". */
@@ -121,6 +149,9 @@ const CarrinhoCompras = React.memo(({
             setDeliveryMethod('retirada');
         }
     }, [isDeliveryAvailable, deliveryMethod, setDeliveryMethod]);
+
+    /* Se fechado, mantem os hooks estaveis e nao renderiza o drawer. */
+    if (!open) return null;
 
     /* ════════════════════════════════════════════════════════════════
        ESTRUTURA JSX — Drawer lateral do carrinho
@@ -166,7 +197,7 @@ const CarrinhoCompras = React.memo(({
                     ) : (
                         <>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {cart.map(i => <CartItem key={i.id} item={i} onQty={updateQty} />)}
+                                {cart.map(i => <CartItem key={i.id} item={i} onQty={updateQty} fmtBRL={fmtBRL} installmentText={installmentText} />)}
                             </div>
 
                             <div className="cart-section" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -213,7 +244,7 @@ const CarrinhoCompras = React.memo(({
                                             <p style={{ fontSize: '12px', fontWeight: '700', color: '#166534', marginBottom: '2px' }}>Funcionamento do Dia a Dia</p>
                                             <p style={{ fontSize: '11px', color: '#166534', lineHeight: 1.35 }}>
                                                 {dayToDayOperationDays || 'Quarta a domingo'}<br />
-                                                {dayToDayOperationHours || '14:00hrs às 20hrs'}
+                                                {dayToDayOperationHours || '14:30hrs às 20hrs'}
                                             </p>
                                         </div>
                                     </div>

@@ -1,0 +1,142 @@
+<!doctype html>
+<!--
+  Painel Administrativo — Helô Confeitaria
+  Deploy: 09/05/2026 | Versão: 20260509-helofix
+  Arquitetura: Dual-HTML (admin.html separado de index.html)
+  Entrypoint: app-admin.js | Bundle: ~150-200KB
+-->
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>Helô Confeitaria | Pedidos e Gestão Avançada</title>
+    <meta name="deploy-version" content="20260509-053850" />
+    <meta
+      name="description"
+      content="Helô Confeitaria: Sistema profissional de pedidos e gestão. Confeitaria e doces artesanais com delivery. Peça pelo WhatsApp, Facebook ou acesse nosso portal de vendas."
+    />
+
+    <!-- Open Graph (OG) - Compartilhamento em Redes Sociais -->
+    <meta property="og:type" content="business.business" />
+    <meta property="og:url" content="https://heloconfeitarianr.web.app/" />
+    <meta
+      property="og:title"
+      content="Helô Confeitaria | Doces Artesanais e Confeitaria"
+    />
+    <meta
+      property="og:description"
+      content="Descubra nossas deliciosas criações: brownies, bolos de chocolate, red velvet e muito mais. Encomende com facilidade pelo nosso sistema integrado com WhatsApp e Facebook."
+    />
+    <meta
+      property="og:image"
+      content="https://heloconfeitarianr.web.app/share-preview.jpg"
+    />
+    <meta
+      property="og:image:secure_url"
+      content="https://heloconfeitarianr.web.app/share-preview.jpg"
+    />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Helô Confeitaria - Doces e Confeitaria Artesanal"
+    />
+    <meta property="og:locale" content="pt_BR" />
+
+    <!-- Twitter Cards - Otimização para X (Twitter) -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://heloconfeitarianr.web.app/" />
+    <meta name="twitter:title" content="Helô Confeitaria | Doces Artesanais" />
+    <meta
+      name="twitter:description"
+      content="Doces e confeitaria artesanal. Brownies, bolos gourmet, red velvet. Peça agora pelo WhatsApp ou Facebook. Delivery disponível."
+    />
+    <meta
+      name="twitter:image"
+      content="https://heloconfeitarianr.web.app/share-preview.jpg"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Helô Confeitaria - Doces e Confeitaria Artesanal"
+    />
+    <meta name="twitter:creator" content="@heloconfeitaria" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="./favicon.svg?v=20260509-053850"
+    />
+    <link
+      rel="alternate icon"
+      type="image/x-icon"
+      href="./favicon.ico?v=20260509-053850"
+    />
+    <link rel="shortcut icon" href="./favicon.ico?v=20260509-053850" />
+
+    <script defer src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script defer src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Bibliotecas do Firebase (Apenas as necessárias para Banco de Dados e Auth) -->
+    <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
+    <!-- QZ Tray — impressão térmica local via impressora conectada por cabo -->
+    <script defer src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.5/qz-tray.js"></script>
+
+    <link
+      rel="stylesheet"
+      id="app-style"
+      href="./css/style.css?v=20260509-053850"
+    />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         SCRIPTS DO PAINEL ADMINISTRATIVO
+         Ordem de dependência (não alterar): app-config → text-date-utils →
+         campaign-utils → componentes → app.js → carrinho → crm → financeiro →
+         estoque → admin-utils → catalog → core-globals → script.js → app-admin.js
+         app-admin é gerado com IIFE próprio (build-public-js). Após deploy,
+         atualizar ?v=20260509-053850 neste HTML para invalidar cache.
+
+         IMPORTANTE: Todos os scripts devem estar em ./js-build/ (transpilados)
+         Live Server e Firebase Hosting não conseguem executar JSX direto.
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <script defer src="./js-build/core/config/app-config.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core/utils/text-date-utils.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core/campaign/campaign-utils.js?v=20260509-053850"></script>
+    <!-- Componentes de marca compartilhados (logo, cabeçalho, rodapé) -->
+    <script defer src="./js-build/components/brand-logo.component.js?v=20260509-053850"></script>
+    <script defer src="./js-build/components/cabecalho.component.js?v=20260509-053850"></script>
+    <script defer src="./js-build/components/rodape-site.component.js?v=20260509-053850"></script>
+    <!-- Módulos de negócio exclusivos do admin -->
+    <script defer src="./js-build/app.js?v=20260509-053850"></script>
+    <script defer src="./js-build/carrinho.js?v=20260509-053850"></script>
+    <script defer src="./js-build/crm.js?v=20260509-053850"></script>
+    <script defer src="./js-build/financeiro.js?v=20260509-053850"></script>
+    <script defer src="./js-build/estoque.js?v=20260509-053850"></script>
+    <!-- Utilitários compartilhados entre vitrine e admin -->
+    <script defer src="./js-build/core/utils/admin-utils.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core/catalog.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core-globals.js?v=20260509-053850"></script>
+    <!-- Entrypoint do admin (app-admin carrega script.js sob demanda após login/feedback) -->
+    <script defer src="./js-build/app-admin.js?v=20260509-053850"></script>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         NOTA DE ARQUITETURA (Fase 1 — Otimização de Performance):
+         Os seguintes módulos da VITRINE foram REMOVIDOS do admin.html
+         pois não são utilizados no painel administrativo:
+         • product-card.component.js — Card individual de produto
+         • vitrine-produtos.component.js — Grid de vitrine pública
+         • cart-ui.js              — Drawer de carrinho do cliente
+         • ui-shell.js             — Modal de login e wrapper AreaAdministrativa
+         • main-app.js             — Entrypoint da vitrine (hero, checkout, etc.)
+         • chat-widget.component.js — Movido para index.html (atende clientes)
+         O painel admin agora usa app-admin.js como entrypoint exclusivo.
+         ═══════════════════════════════════════════════════════════════════════ -->
+  </body>
+</html>

@@ -17,138 +17,10 @@
       Financeiro, Feedbacks, Campanhas, Configurações
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Hooks React ──────────────────────────────────────────────────────
-   useState: gerencia estado local
-   useEffect: roda efeitos colaterais (listeners, sync)
-   useMemo: memoiza cálculos pesados
-   useCallback: memoiza funções para evitar re-render
-   useRef: referência mutável que não causa re-render */
-const { useState, useEffect, useMemo, useCallback, useRef } = React;
-/* ── Imports do módulo HeloApp (app.js) ──────────────────────────────
-   Constantes de campanha, taxas, configurações térmicas, utilitários
-   de formatação, normalização e segurança QZ Tray para impressão. */
-const {
-    auth,
-    db,
-    getCol,
-    getMetaDoc,
-    CAMPAIGN_LEGACY_ID,
-    CAMPAIGN_GENERAL_ID,
-    CAMPAIGN_DEFAULT_NAME,
-    CAMPAIGN_GENERAL_NAME,
-    CAMPAIGN_MODE_MANUAL,
-    CAMPAIGN_MODE_AUTO,
-    CAMPAIGN_MODE_HYBRID,
-    ADMIN_CLAIM_KEY,
-    DELIVERY_FEE,
-    DAY_TO_DAY_DELIVERY_FEE,
-    VIP_THRESHOLD,
-    VIP_DISCOUNT,
-    CARD_INSTALLMENT_RATES,
-    DEFAULT_THERMAL_PRINT_SETTINGS,
-    safeText,
-    pad2,
-    getDateOnlyPartsFromDate,
-    getDateOnlyParts,
-    normalizeDateOnlyValue,
-    formatDateOnlyForDisplay,
-    toLocalDateFromDateOnly,
-    getLocalMonthStr,
-    fmtBRL,
-    cardTotalWithRate,
-    installmentText,
-    formatDate,
-    formatDateStr,
-    fmtAgendamento,
-    normalizeCampaignStatus,
-    normalizeCampaignId,
-    normalizeCampaignName,
-    normalizeCampaignMode,
-    normalizeDateOnlyOrEmpty,
-    normalizeCampaignPriority,
-    toLocalDayStart,
-    toLocalDayEnd,
-    isCampaignAutoActiveNow,
-    getCampaignScheduleRange,
-    buildCampaignScheduleConflicts,
-    formatCampaignWindowLabel,
-    isFirestorePermissionDenied,
-    slugifyCampaignId,
-    normalizeCampaignDoc,
-    campaignBadgeStyle,
-    QZ_SECURITY_ENABLED,
-    QZ_CERT_ENDPOINT,
-    QZ_SIGN_ENDPOINT,
-    QZ_SIGN_ALGORITHM,
-} = window.HeloApp;
-
-/* ── Imports do módulo HeloCart (carrinho.js) ──────────────────────
-   Hooks de carrinho, cliente especial e cálculo de total do pedido. */
-const {
-    useCart,
-    useSpecialClient,
-    useOrderTotal,
-} = window.HeloCart;
-
-/* ── Imports do módulo HeloCrm (crm.js) ──────────────────────────────
-   Formatação de telefone, categorias/status de agendamento,
-   notificações, alertas sonoros, processamento em lotes,
-   detecção de duplicatas e cores de status. */
-const {
-    formatPhoneForWhatsApp,
-    getTodayStr,
-    normalizeTimeValue,
-    combineDateTime,
-    getDaysUntilDateOnlyValue,
-    ADMIN_SCHEDULE_CATEGORIES,
-    ADMIN_SCHEDULE_STATUSES,
-    adminScheduleCategoryLabel,
-    normalizeSchedulePaymentToOrder,
-    normalizeScheduleStatusToOrder,
-    normalizeOrderStatusToSchedule,
-    adminScheduleStatusColor,
-    createAdminScheduleForm,
-    ADMIN_SCHEDULE_NOTIFICATION_KEY,
-    ADMIN_SCHEDULE_ALERT_SETTINGS_KEY,
-    DEFAULT_ADMIN_SCHEDULE_ALERT_SETTINGS,
-    readAdminScheduleNotifications,
-    writeAdminScheduleNotifications,
-    readAdminScheduleAlertSettings,
-    writeAdminScheduleAlertSettings,
-    runAsyncInBatches,
-    statusColor,
-    buildDuplicateSet,
-} = window.HeloCrm;
-
-/* ── Imports do módulo HeloFinance (financeiro.js) ──────────────────
-   safeMoney: utilitário de formatação monetária (função pura, pode ficar no topo).
-   useFinanceDomain: HOOK — importado DENTRO do AdminPanel (linha ~1555). */
-const {
-    safeMoney,
-} = window.HeloFinance;
-
-/* ── Import do módulo HeloInventory (estoque.js) ────────────────────
-   useInventoryDomain: HOOK — importado DENTRO do AdminPanel (linha ~1619). */
-
-/* ── Imports do módulo HeloAdminUtils (core/utils/admin-utils.js) ────
-   Constantes e utilitários compartilhados do painel administrativo.
-   Migrados de script.js para admin-utils.js (Passo 1 da modularização SRP). */
-const {
-    normalizeText,
-    toTimestampMillis,
-    isConcludedStatusValue,
-    getOrderCreatedAtMillis,
-    ensureFormFieldIdentifiers,
-    ensureLabelAssociations,
-    buildStaticAssetUrl,
-    normalizeSearchTerm,
-    buildSearchableText,
-    ORDER_STATUS_CONCLUDED_KEY,
-    OPERATION_CONCLUDED_VISIBILITY_MINUTES,
-    OPERATION_CONCLUDED_VISIBILITY_MS,
-    OPERATION_ACTIVE_STATUSES,
-    STATIC_ASSET_VERSION,
-} = window.HeloAdminUtils;
+/* As desestruturações de React, HeloApp, HeloCart, HeloCrm, HeloFinance,
+   e HeloAdminUtils agora são carregadas globalmente via core-globals.js.
+   Isso permite que main-app.js acesse essas variáveis sem carregar
+   este arquivo (script.js) na vitrine pública. */
 
 /* ════════════════════════════════════════════════════════════════
    FeedbackExperience — Tela de pesquisa de satisfação pós-venda
@@ -443,7 +315,7 @@ const ImageManager = ({ images, onChange }) => {
 };
 
 /* ── Sub-components ─────────────────────────────────────── */
-const ProductCard = (window.HeloComponents && window.HeloComponents.ProductCard)
+var ProductCard = (window.HeloComponents && window.HeloComponents.ProductCard)
     ? window.HeloComponents.ProductCard
     : React.memo(({ product: p, onAdd, onOpenDetails, isBestSeller }) => {
     const allImages = React.useMemo(() => {
@@ -574,7 +446,7 @@ const CartItem = React.memo(({ item, onQty }) => (
 
 /* ── Imports do módulo HeloCatalog (core/catalog.js) ────────────────
    Constantes e funções do cardápio migradas do script.js (Passo 2 SRP). */
-const {
+var {
     CATEGORIAS,
     UNITS,
     CONVERSION_UNITS,
@@ -637,21 +509,7 @@ const buildElginI9CutSequence = ({ cutMode = 'full', feedLines = ELGIN_I9_FEED_L
     return sequence.filter(Boolean);
 };
 
-const normalizeThermalPrintMode = (value) => safeText(value, 'escpos').toLowerCase().trim() === 'browser' ? 'browser' : 'escpos';
-const normalizeThermalPrintTicketMode = (value) => {
-    const mode = safeText(value, 'both').toLowerCase().trim();
-    if (mode === 'kitchen' || mode === 'cashier' || mode === 'both') return mode;
-    return 'both';
-};
-const normalizeThermalPrintSettings = (settings = {}) => ({
-    thermalPrintEnabled: settings.thermalPrintEnabled === true,
-    thermalPrintAutoOnOrder: settings.thermalPrintAutoOnOrder !== false,
-    thermalPrinterName: safeText(settings.thermalPrinterName).trim(),
-    thermalPrintCopies: Math.max(1, Math.min(5, Number(settings.thermalPrintCopies) || 1)),
-    thermalPrintMode: normalizeThermalPrintMode(settings.thermalPrintMode),
-    thermalPrintTicketMode: normalizeThermalPrintTicketMode(settings.thermalPrintTicketMode),
-    thermalPrintBrowserFallback: settings.thermalPrintBrowserFallback !== false,
-});
+
 
 const toThermalSafe = (value) => safeText(value)
     .normalize('NFD')
@@ -1039,7 +897,28 @@ const describeThermalPrintError = (error) => {
    - Controle de escassez e modo evento
    - Gerenciamento de abas do cardápio público
    ═══════════════════════════════════════════════════════════════════════ */
-const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, recipes, feedbacks, financialEntries, campaigns = [], activeCampaignId = CAMPAIGN_GENERAL_ID, onExit, siteSettings = {}, onSaveSettings }) => {
+const AdminPanel = ({
+    allOrders,
+    allCoupons,
+    products,
+    visitsData,
+    ingredients,
+    recipes,
+    feedbacks,
+    financialEntries,
+    campaigns = [],
+    activeCampaignId = CAMPAIGN_GENERAL_ID,
+    onExit,
+    siteSettings = {},
+    onSaveSettings,
+    onAdminTabChange,
+    onLoadMoreOrders,
+    ordersPageSize = 50,
+    ordersHasMore = false,
+    ordersLastSyncAt = 0,
+    ordersRealtimeChannelStatus = 'idle',
+    ordersRealtimeRecentFailures = 0,
+}) => {
     /* ── Estados de navegação e filtros gerais ──────────────────────
        - tab: aba ativa do painel (orders, schedule, deliveries, etc.)
        - prodTab: sub-aba de Produção & Estoque (dash, ingredients, recipes)
@@ -1052,6 +931,12 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
     const [prodTab, setProdTab] = useState('dash');
     const [feedbackFilter, setFeedbackFilter] = useState('all');
     const [feedbackStatusFilter, setFeedbackStatusFilter] = useState('all');
+
+    useEffect(() => {
+        if (typeof onAdminTabChange === 'function') {
+            onAdminTabChange(tab);
+        }
+    }, [tab, onAdminTabChange]);
 
     /* ── Estados de formulários de CRUD ──────────────────────────────
        - newProd: formulário de novo produto (nome, preço, tamanho, etc.)
@@ -1174,6 +1059,13 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
     const [selectedScheduleIds, setSelectedScheduleIds] = useState([]);
     const [scheduleAlerts, setScheduleAlerts] = useState([]);
     const [orderRealtimeToasts, setOrderRealtimeToasts] = useState([]);
+    const [orderFlowFeedbackToasts, setOrderFlowFeedbackToasts] = useState([]);
+    const [lastAutoPrintStatus, setLastAutoPrintStatus] = useState({
+        state: 'idle',
+        label: 'Aguardando confirmação de pedido',
+        orderId: '',
+        updatedAt: 0,
+    });
     const [scheduleAlertSettings, setScheduleAlertSettings] = useState(() => readAdminScheduleAlertSettings());
     /* ── Permissão de notificação e refs de áudio/tempo real ──────────
        notificationPermission: estado da permissão de Notification API
@@ -1198,7 +1090,38 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
     const orderNotificationInteractionUnlockedRef = useRef(false);
     const orderNotificationSoundCooldownRef = useRef(0);
     const orderToastTimersRef = useRef(new Map());
+    const orderFlowToastTimersRef = useRef(new Map());
+    const orderNotificationSeenKeysRef = useRef(new Set());
     const triggerRealtimeOrderAlertsRef = useRef(() => {});
+    const autoPrintExecutionMapRef = useRef(new Map());
+    const orderStatusUpdateInFlightRef = useRef(new Set());
+
+    const toOrderCreatedMs = useCallback((orderLike = {}) => {
+        const createdMs = getOrderCreatedAtMillis({ createdAt: orderLike?.createdAt });
+        return Number.isFinite(createdMs) ? createdMs : 0;
+    }, []);
+
+    const buildOrderNotificationKey = useCallback((orderLike = {}) => {
+        const orderId = safeText(orderLike?.id).trim();
+        if (!orderId) return '';
+        return `${orderId}::${toOrderCreatedMs(orderLike)}`;
+    }, [toOrderCreatedMs]);
+
+    const ordersRealtimeHealth = useMemo(() => {
+        if (ordersRealtimeChannelStatus === 'online') {
+            return { label: 'Canal realtime: online', color: '#166534', bg: '#dcfce7', dot: '#16a34a' };
+        }
+        if (ordersRealtimeChannelStatus === 'reconnecting') {
+            return { label: 'Canal realtime: reconectando', color: '#9a3412', bg: '#ffedd5', dot: '#ea580c' };
+        }
+        if (ordersRealtimeChannelStatus === 'error') {
+            return { label: 'Canal realtime: falha', color: '#991b1b', bg: '#fee2e2', dot: '#dc2626' };
+        }
+        if (ordersRealtimeChannelStatus === 'connecting') {
+            return { label: 'Canal realtime: conectando', color: '#1e3a8a', bg: '#dbeafe', dot: '#2563eb' };
+        }
+        return { label: 'Canal realtime: aguardando', color: '#334155', bg: '#e2e8f0', dot: '#64748b' };
+    }, [ordersRealtimeChannelStatus]);
 
     /* ── Estilo base para campos de input do painel admin ─────────── */
     const inp = { padding: '.75rem', background: '#fff', color: 'var(--primary)', borderRadius: '.75rem', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', width: '100%' };
@@ -1316,7 +1239,10 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
         setScheduleForm(prev => ({ ...prev, campaignId: prev.campaignId || next }));
     }, [activeCampaignId, defaultMenuTabKey]);
 
-    const dupSet = useMemo(() => buildDuplicateSet(allOrders), [allOrders]);
+    const dupSet = useMemo(() => {
+        if (tab !== 'orders') return new Set();
+        return buildDuplicateSet(allOrders);
+    }, [allOrders, tab]);
 
     const filteredMenuProducts = useMemo(() => {
         const normalizedSearch = normalizeText(menuSearch).toLowerCase();
@@ -1474,7 +1400,7 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
 
     // Firestore listener para entregadores
     useEffect(() => {
-        if (!db) return;
+        if (!db || !['orders', 'deliveries', 'drivers'].includes(tab)) return undefined;
         let unsub = () => {};
         try {
             unsub = getCol('drivers')
@@ -1487,7 +1413,7 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
             console.warn('drivers init error:', e.message);
         }
         return () => unsub();
-    }, []);
+    }, [db, tab]);
 
     const activeDrivers = useMemo(() => drivers.filter(d => d.active !== false), [drivers]);
 
@@ -1497,7 +1423,7 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
        dateOnly, page, utmSource, utmMedium, utmCampaign, source, device, browser.
        Ordena por timestamp descendente para que os mais recentes apareçam primeiro. */
     useEffect(() => {
-        if (!db) return;
+        if (!db || tab !== 'visits') return undefined;
         let unsub = () => {};
         try {
             unsub = getCol('site_visits')
@@ -1510,7 +1436,7 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
             console.warn('site_visits init error:', e.message);
         }
         return () => unsub();
-    }, []);
+    }, [db, tab]);
 
     /* ════════════════════════════════════════════════════════════════
        PAINEL DE ANÁLISE DE TRÁFEGO — Dados computados (useMemo)
@@ -2115,12 +2041,15 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
             return searchableText.includes(term);
         });
     }, [productSalesStats.list, prodSearch]);
-    const feedbackMap = useMemo(() => Object.fromEntries((feedbacks || []).map(f => [f.orderId || f.id, f])), [feedbacks]);
+    const feedbackMap = useMemo(() => {
+        if (tab !== 'feedback') return {};
+        return Object.fromEntries((feedbacks || []).map(f => [f.orderId || f.id, f]));
+    }, [feedbacks, tab]);
     const concludedOrders = useMemo(() => (
-        (allOrders || [])
+        (tab === 'feedback' ? (allOrders || []) : [])
             .filter(o => safeText(o.status).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() === 'concluido' && safeText(o.customerPhone))
             .map(o => ({ ...o, feedback: feedbackMap[o.id] || null }))
-    ), [allOrders, feedbackMap]);
+    ), [allOrders, feedbackMap, tab]);
 
     const filteredFeedbackOrders = useMemo(() => {
         return concludedOrders.filter(order => {
@@ -2142,6 +2071,7 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
     }, [concludedOrders, feedbackFilter, feedbackStatusFilter]);
 
     useEffect(() => {
+        if (tab !== 'agenda') return undefined;
         const unsub = getCol('agendamentos').onSnapshot(
             snap => setAdminSchedules(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
             err => {
@@ -2152,7 +2082,7 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
             }
         );
         return unsub;
-    }, []);
+    }, [tab]);
 
     useEffect(() => {
         setLocalSettings({
@@ -2226,6 +2156,9 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
         return () => {
             orderToastTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
             orderToastTimersRef.current.clear();
+            orderFlowToastTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+            orderFlowToastTimersRef.current.clear();
+            autoPrintExecutionMapRef.current.clear();
             const audio = orderNotificationAudioRef.current;
             if (audio) {
                 try {
@@ -2509,6 +2442,20 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
         setOrderRealtimeToasts(prev => prev.filter(item => item.id !== id));
     }, []);
 
+    /**
+     * Remove um toast operacional de fluxo de pedido e limpa timer.
+     * @param {string} id - Identificador único do toast.
+     * @returns {void}
+     */
+    const dismissOrderFlowFeedbackToast = useCallback((id) => {
+        const timerId = orderFlowToastTimersRef.current.get(id);
+        if (timerId) {
+            window.clearTimeout(timerId);
+            orderFlowToastTimersRef.current.delete(id);
+        }
+        setOrderFlowFeedbackToasts(prev => prev.filter(item => item.id !== id));
+    }, []);
+
     const dismissAllScheduleAlerts = useCallback(() => {
         setScheduleAlerts([]);
     }, []);
@@ -2533,6 +2480,40 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
         }, 7000);
 
         orderToastTimersRef.current.set(toastId, timerId);
+    }, []);
+
+    /**
+     * Exibe toast operacional sem bloquear o atendimento do operador.
+     * @param {Object} payload - Dados visuais do toast.
+     * @param {string} payload.title - Título principal do toast.
+     * @param {string} payload.body - Texto complementar.
+     * @param {string} [payload.tone='info'] - Tom visual: info/success/warning/error.
+     * @param {number} [payload.durationMs=9000] - Tempo de exibição em ms.
+     * @returns {void}
+     */
+    const pushOrderFlowFeedbackToast = useCallback(({
+        title,
+        body,
+        tone = 'info',
+        durationMs = 9000,
+    }) => {
+        const toastId = `order-flow-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        setOrderFlowFeedbackToasts(prev => [
+            {
+                id: toastId,
+                title: safeText(title, 'Atualização de pedido'),
+                body: safeText(body),
+                tone: ['success', 'warning', 'error'].includes(tone) ? tone : 'info',
+            },
+            ...prev,
+        ].slice(0, 5));
+
+        const timerId = window.setTimeout(() => {
+            setOrderFlowFeedbackToasts(prev => prev.filter(item => item.id !== toastId));
+            orderFlowToastTimersRef.current.delete(toastId);
+        }, Math.max(3000, Number(durationMs) || 9000));
+
+        orderFlowToastTimersRef.current.set(toastId, timerId);
     }, []);
 
     const playNewOrderNotificationSound = useCallback(() => {
@@ -2586,13 +2567,31 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
     }, []);
 
     const triggerRealtimeOrderAlerts = useCallback((order) => {
+        const notificationKey = buildOrderNotificationKey(order);
+        if (notificationKey && orderNotificationSeenKeysRef.current.has(notificationKey)) return;
+        if (notificationKey) orderNotificationSeenKeysRef.current.add(notificationKey);
+        if (orderNotificationSeenKeysRef.current.size > 1500) {
+            /* Evita crescimento ilimitado em sessões longas no painel. */
+            orderNotificationSeenKeysRef.current = new Set(Array.from(orderNotificationSeenKeysRef.current).slice(-1000));
+        }
         pushOrderRealtimeToast(order);
         playNewOrderNotificationSound();
         notifyDesktopNewOrder();
-    }, [notifyDesktopNewOrder, playNewOrderNotificationSound, pushOrderRealtimeToast]);
+    }, [buildOrderNotificationKey, notifyDesktopNewOrder, playNewOrderNotificationSound, pushOrderRealtimeToast]);
 
     useEffect(() => {
         triggerRealtimeOrderAlertsRef.current = triggerRealtimeOrderAlerts;
+    }, [triggerRealtimeOrderAlerts]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+        const handleOrderCreatedEvent = (event) => {
+            const order = event?.detail?.order;
+            if (!order?.id) return;
+            triggerRealtimeOrderAlerts(order);
+        };
+        window.addEventListener('helo:order-created', handleOrderCreatedEvent);
+        return () => window.removeEventListener('helo:order-created', handleOrderCreatedEvent);
     }, [triggerRealtimeOrderAlerts]);
 
     const playScheduleAlertSound = useCallback((level = 1) => {
@@ -3470,12 +3469,22 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
         return lines.join('\n');
     }, [resolveCatalogItemName]);
 
-    const openConfirmedOrderWhatsApp = useCallback((order, popupRef = null) => {
+    /**
+     * Monta e abre a mensagem de WhatsApp para confirmação de pedido.
+     * @param {Object} order - Pedido confirmado.
+     * @param {Window|null} popupRef - Janela já aberta pelo gesto do usuário.
+     * @param {{silentUi?: boolean}} options - Controle para evitar alert bloqueante.
+     * @returns {{ok: boolean, status: string, message: string}} Resultado da tentativa.
+     */
+    const openConfirmedOrderWhatsApp = useCallback((order, popupRef = null, options = {}) => {
+        const silentUi = options?.silentUi === true;
         const waPhone = formatPhoneForWhatsApp(order?.customerPhone);
         if (!waPhone) {
             if (popupRef && !popupRef.closed) popupRef.close();
-            alert('Pedido confirmado, mas o cliente não possui WhatsApp válido para contato automático.');
-            return false;
+            if (!silentUi) {
+                alert('Pedido confirmado, mas o cliente não possui WhatsApp válido para contato automático.');
+            }
+            return { ok: false, status: 'missing_phone', message: 'Cliente sem WhatsApp válido cadastrado.' };
         }
 
         const formatCurrency = (value) => Number(value || 0).toFixed(2).replace('.', ',');
@@ -3559,48 +3568,119 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
         if (popupRef && !popupRef.closed) {
             try {
                 popupRef.location.replace(waUrl);
-                return true;
+                return { ok: true, status: 'sent', message: 'Mensagem de confirmação enviada no WhatsApp.' };
             } catch (error) {
                 console.warn('Falha ao redirecionar popup do WhatsApp:', safeText(error?.message || error));
             }
         }
         const waTab = window.open(waUrl, '_blank');
         if (!waTab) {
-            alert('Pedido confirmado, mas o navegador bloqueou a abertura do WhatsApp. Permita pop-ups para este site.');
-            return false;
+            if (!silentUi) {
+                alert('Pedido confirmado, mas o navegador bloqueou a abertura do WhatsApp. Permita pop-ups para este site.');
+            }
+            return { ok: false, status: 'blocked_popup', message: 'Navegador bloqueou o popup do WhatsApp.' };
         }
-        return true;
+        return { ok: true, status: 'sent', message: 'Mensagem de confirmação enviada no WhatsApp.' };
     }, [buildConfirmedOrderItemsText]);
 
+    /**
+     * Executa fluxo premium de confirmação: WhatsApp + impressão automática.
+     * @param {Object} order - Pedido na transição Novo -> Confirmado.
+     * @param {Window|null} popupRef - Janela já aberta para WhatsApp.
+     * @returns {Promise<{whatsappStatus:string, printStatus:string, printMessage:string, duplicate:boolean}>}
+     */
     const runConfirmedOrderAutomation = useCallback(async (order, popupRef = null) => {
+        const nowMs = Date.now();
+        if (autoPrintExecutionMapRef.current.size > 600) {
+            const minAllowedMs = nowMs - (1000 * 60 * 60 * 2);
+            Array.from(autoPrintExecutionMapRef.current.entries()).forEach(([key, value]) => {
+                if ((Number(value?.updatedAt) || 0) < minAllowedMs) autoPrintExecutionMapRef.current.delete(key);
+            });
+        }
+        const automationKey = buildOrderNotificationKey(order) || `order-${safeText(order?.id)}`;
+        const currentExecution = autoPrintExecutionMapRef.current.get(automationKey);
+        if (currentExecution && ['pending', 'printing', 'printed', 'fallback'].includes(currentExecution.state)) {
+            return {
+                whatsappStatus: 'duplicate_guard',
+                printStatus: currentExecution.state,
+                printMessage: 'Fluxo premium já executado para este evento de confirmação.',
+                duplicate: true,
+            };
+        }
+
+        autoPrintExecutionMapRef.current.set(automationKey, { state: 'pending', updatedAt: Date.now() });
+        setLastAutoPrintStatus({
+            state: 'pending',
+            label: 'Fluxo de impressão em fila (pending)',
+            orderId: safeText(order?.id),
+            updatedAt: Date.now(),
+        });
+
         const settings = normalizeThermalPrintSettings(localSettings);
+        const whatsappResult = openConfirmedOrderWhatsApp(order, popupRef, { silentUi: true });
+        let printStatus = 'pending';
+        let printMessage = 'Aguardando impressão automática.';
 
-        // Prioriza o envio do WhatsApp usando a aba já aberta pelo gesto do usuário.
-        openConfirmedOrderWhatsApp(order, popupRef);
+        if (!settings.thermalPrintEnabled || !settings.thermalPrintAutoOnOrder) {
+            printStatus = 'skipped';
+            printMessage = 'Impressão automática desativada nas configurações.';
+            autoPrintExecutionMapRef.current.set(automationKey, { state: printStatus, updatedAt: Date.now() });
+            setLastAutoPrintStatus({
+                state: printStatus,
+                label: printMessage,
+                orderId: safeText(order?.id),
+                updatedAt: Date.now(),
+            });
+            return { whatsappStatus: whatsappResult.status, printStatus, printMessage, duplicate: false };
+        }
 
-        if (settings.thermalPrintEnabled && settings.thermalPrintAutoOnOrder) {
-            const orderForPrint = buildOrderPrintPayloadFromOrder(order);
-            try {
-                if (settings.thermalPrintMode === 'browser') {
+        const orderForPrint = buildOrderPrintPayloadFromOrder(order);
+        try {
+            printStatus = 'printing';
+            printMessage = 'Impressão automática em andamento...';
+            autoPrintExecutionMapRef.current.set(automationKey, { state: printStatus, updatedAt: Date.now() });
+            setLastAutoPrintStatus({
+                state: printStatus,
+                label: printMessage,
+                orderId: safeText(order?.id),
+                updatedAt: Date.now(),
+            });
+
+            if (settings.thermalPrintMode === 'browser') {
+                printOrderViaBrowser(orderForPrint, null, settings);
+            } else {
+                await printOrderViaQz(orderForPrint, settings);
+            }
+            printStatus = 'printed';
+            printMessage = 'Impressão automática concluída.';
+        } catch (error) {
+            const friendlyError = describeThermalPrintError(error);
+            if (settings.thermalPrintBrowserFallback) {
+                try {
                     printOrderViaBrowser(orderForPrint, null, settings);
-                } else {
-                    await printOrderViaQz(orderForPrint, settings);
+                    printStatus = 'fallback';
+                    printMessage = `QZ indisponível, fallback de navegador executado (${friendlyError}).`;
+                } catch (fallbackError) {
+                    console.warn('Falha no fallback da impressão automática de confirmação:', safeText(fallbackError?.message || fallbackError));
+                    printStatus = 'failed';
+                    printMessage = `Impressão automática falhou: ${friendlyError}`;
                 }
-            } catch (error) {
-                const friendlyError = describeThermalPrintError(error);
-                if (settings.thermalPrintBrowserFallback) {
-                    try {
-                        printOrderViaBrowser(orderForPrint, null, settings);
-                    } catch (fallbackError) {
-                        console.warn('Falha no fallback da impressão automática de confirmação:', safeText(fallbackError?.message || fallbackError));
-                        alert(`Pedido confirmado, mas a impressão automática falhou: ${friendlyError}`);
-                    }
-                } else {
-                    alert(`Pedido confirmado, mas a impressão automática falhou: ${friendlyError}`);
-                }
+            } else {
+                printStatus = 'failed';
+                printMessage = `Impressão automática falhou: ${friendlyError}`;
             }
         }
-    }, [localSettings, buildOrderPrintPayloadFromOrder, openConfirmedOrderWhatsApp]);
+
+        autoPrintExecutionMapRef.current.set(automationKey, { state: printStatus, updatedAt: Date.now() });
+        setLastAutoPrintStatus({
+            state: printStatus,
+            label: printMessage,
+            orderId: safeText(order?.id),
+            updatedAt: Date.now(),
+        });
+
+        return { whatsappStatus: whatsappResult.status, printStatus, printMessage, duplicate: false };
+    }, [localSettings, buildOrderNotificationKey, buildOrderPrintPayloadFromOrder, openConfirmedOrderWhatsApp]);
 
     const runThermalDiagnostic = useCallback(async ({ connectIfNeeded = false } = {}) => {
         if (thermalDiagBusyRef.current) return;
@@ -3692,7 +3772,24 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
         // Passive check avoids triggering repeated permission prompts while opening settings.
         runThermalDiagnostic({ connectIfNeeded: false });
     }, [tab, runThermalDiagnostic]);
+
+    /**
+     * Traduz resultado de impressão premium para tom visual de toast.
+     * @param {string} printStatus - Estado da impressão automática.
+     * @returns {'success'|'warning'|'error'|'info'} Tom visual do feedback.
+     */
+    const getPrintToastTone = useCallback((printStatus) => {
+        if (printStatus === 'printed') return 'success';
+        if (printStatus === 'fallback') return 'warning';
+        if (printStatus === 'failed') return 'error';
+        return 'info';
+    }, []);
+
     const updateStatus = useCallback(async (order, nextStatus) => {
+        const inFlightKey = `${safeText(order?.id)}::${safeText(nextStatus)}`;
+        if (orderStatusUpdateInFlightRef.current.has(inFlightKey)) return;
+        orderStatusUpdateInFlightRef.current.add(inFlightKey);
+
         const orderRef = getCol('orders').doc(order.id);
         const total = Number(order.total) || 0;
         const currentStatusKey = normalizeOrderStatusKey(order?.status);
@@ -3759,7 +3856,36 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
             if (['Novo', 'Confirmado'].includes(nextStatus)) {
                 await orderRef.update({ status: nextStatus, ...concludedFieldResetPayload });
                 if (isNewToConfirmedTransition) {
-                    await runConfirmedOrderAutomation({ ...order, status: nextStatus }, whatsappPopup);
+                    const automationResult = await runConfirmedOrderAutomation({ ...order, status: nextStatus }, whatsappPopup);
+                    const customerLabel = safeText(order?.customerName, 'Cliente').trim() || 'Cliente';
+                    const whatsappLabel = automationResult.whatsappStatus === 'sent'
+                        ? 'WhatsApp enviado'
+                        : automationResult.whatsappStatus === 'missing_phone'
+                            ? 'WhatsApp pendente (contato inválido)'
+                            : automationResult.whatsappStatus === 'blocked_popup'
+                                ? 'WhatsApp pendente (popup bloqueado)'
+                                : automationResult.whatsappStatus === 'duplicate_guard'
+                                    ? 'WhatsApp já processado'
+                                    : 'WhatsApp em verificação';
+
+                    const printLabel = automationResult.printStatus === 'printed'
+                        ? 'Impressão automática concluída'
+                        : automationResult.printStatus === 'fallback'
+                            ? 'Impressão via fallback do navegador'
+                            : automationResult.printStatus === 'failed'
+                                ? 'Impressão com falha'
+                                : automationResult.printStatus === 'skipped'
+                                    ? 'Impressão automática desativada'
+                                    : automationResult.printStatus === 'printing'
+                                        ? 'Impressão em andamento'
+                                        : 'Impressão em fila';
+
+                    pushOrderFlowFeedbackToast({
+                        title: `Pedido confirmado - ${customerLabel}`,
+                        body: `${whatsappLabel} • ${printLabel}`,
+                        tone: getPrintToastTone(automationResult.printStatus),
+                        durationMs: automationResult.printStatus === 'failed' ? 14000 : 9000,
+                    });
                 }
                 return;
             }
@@ -3800,8 +3926,10 @@ const AdminPanel = ({ allOrders, allCoupons, products, visitsData, ingredients, 
             if (whatsappPopup && !whatsappPopup.closed) whatsappPopup.close();
             console.error('Erro ao atualizar status do pedido:', error);
             alert('Não foi possível atualizar o status do pedido.');
+        } finally {
+            orderStatusUpdateInFlightRef.current.delete(inFlightKey);
         }
-    }, [normalizeOrderStatusKey, runConfirmedOrderAutomation]);
+    }, [getPrintToastTone, normalizeOrderStatusKey, pushOrderFlowFeedbackToast, runConfirmedOrderAutomation]);
     const deleteDoc = useCallback(async (col, id) => { if (confirm('Deseja realmente apagar?')) await getCol(col).doc(id).delete(); }, []);
 
     // Funções auxiliares para entregas
@@ -4515,6 +4643,67 @@ ${feedbackUrl}`;
                     </div>
                 )}
 
+                {orderFlowFeedbackToasts.length > 0 && (
+                    <div style={{
+                        position: 'fixed',
+                        top: orderRealtimeToasts.length > 0 ? '176px' : '16px',
+                        right: '16px',
+                        width: 'min(400px, calc(100vw - 32px))',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        zIndex: 255,
+                    }}>
+                        {orderFlowFeedbackToasts.map((toast) => {
+                            const toneStyles = toast.tone === 'success'
+                                ? { bg: 'linear-gradient(145deg, #ecfdf3 0%, #dcfce7 100%)', border: '#86efac', accent: '#16a34a', text: '#166534' }
+                                : toast.tone === 'warning'
+                                    ? { bg: 'linear-gradient(145deg, #fff7ed 0%, #ffedd5 100%)', border: '#fdba74', accent: '#ea580c', text: '#9a3412' }
+                                    : toast.tone === 'error'
+                                        ? { bg: 'linear-gradient(145deg, #fef2f2 0%, #fee2e2 100%)', border: '#fca5a5', accent: '#dc2626', text: '#991b1b' }
+                                        : { bg: 'linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%)', border: '#93c5fd', accent: '#2563eb', text: '#1e3a8a' };
+                            return (
+                                <div key={toast.id} style={{
+                                    background: toneStyles.bg,
+                                    border: `1px solid ${toneStyles.border}`,
+                                    borderLeft: `6px solid ${toneStyles.accent}`,
+                                    borderRadius: '12px',
+                                    padding: '12px 14px',
+                                    boxShadow: '0 12px 28px -16px rgba(30,41,59,.35)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    gap: '10px',
+                                    alignItems: 'flex-start',
+                                }}>
+                                    <div>
+                                        <p style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '.08em', textTransform: 'uppercase', color: toneStyles.text, marginBottom: '4px' }}>
+                                            Fluxo de confirmação
+                                        </p>
+                                        <p style={{ fontSize: '13px', color: toneStyles.text, fontWeight: '700', lineHeight: 1.3 }}>{toast.title}</p>
+                                        <p style={{ fontSize: '12px', color: toneStyles.text, lineHeight: 1.35, marginTop: '2px' }}>{toast.body}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => dismissOrderFlowFeedbackToast(toast.id)}
+                                        style={{
+                                            border: 'none',
+                                            background: '#fff',
+                                            color: toneStyles.text,
+                                            padding: '6px 10px',
+                                            borderRadius: '9999px',
+                                            cursor: 'pointer',
+                                            fontWeight: '800',
+                                            fontSize: '11px',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
                 {scheduleAlerts.length > 0 && (
                     <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{
@@ -4718,11 +4907,28 @@ ${feedbackUrl}`;
                                 <h3 style={{ fontWeight: '700', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <i className="ph-bold ph-receipt" style={{ color: 'var(--gold)' }}></i> Fluxo de Pedidos ({filtered.length})
                                 </h3>
+                                <div style={{ fontSize: '11px', color: 'var(--s500)', fontWeight: '700' }}>
+                                    Última atualização: {ordersLastSyncAt ? new Date(ordersLastSyncAt).toLocaleTimeString('pt-BR') : 'aguardando...'}
+                                </div>
                                 <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '8px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', gap: '8px' }}>
                                     <i className="ph-bold ph-magnifying-glass" style={{ color: 'var(--s400)' }}></i>
                                     <input type="text" placeholder="Pesquisar cliente, telefone, item, categoria, status..." value={search} onChange={e => setSearch(e.target.value)}
                                         style={{ background: 'none', border: 'none', outline: 'none', fontSize: '14px', width: '260px' }} />
                                 </div>
+                            </div>
+                            <div style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #f1f5f9', background: '#fcfcfd', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '9999px', padding: '7px 12px', background: ordersRealtimeHealth.bg, color: ordersRealtimeHealth.color, fontSize: '11px', fontWeight: '800' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '9999px', background: ordersRealtimeHealth.dot }}></span>
+                                    {ordersRealtimeHealth.label}
+                                </div>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '9999px', padding: '7px 12px', background: '#eef2ff', color: '#3730a3', fontSize: '11px', fontWeight: '800' }}>
+                                    Última impressão: {safeText(lastAutoPrintStatus.label)}
+                                </div>
+                                {ordersRealtimeRecentFailures > 0 && (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '9999px', padding: '7px 12px', background: '#fff7ed', color: '#9a3412', fontSize: '11px', fontWeight: '800' }}>
+                                        Falhas recentes no canal: {ordersRealtimeRecentFailures}
+                                    </div>
+                                )}
                             </div>
                             <div style={{ padding: '0.6rem 1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', background: '#fafafa' }}>
                                 <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--s500)', letterSpacing: '.06em' }}>Pagamento:</span>
@@ -4744,6 +4950,25 @@ ${feedbackUrl}`;
                                             <option key={c.id} value={c.id}>{c.nome}</option>
                                         ))}
                                     </select>
+                                    {orderCampaignFilter === 'all' && typeof onLoadMoreOrders === 'function' && (
+                                        <button
+                                            onClick={onLoadMoreOrders}
+                                            disabled={!ordersHasMore}
+                                            style={{
+                                                ...btn,
+                                                padding: '6px 12px',
+                                                fontSize: '11px',
+                                                borderRadius: '9999px',
+                                                background: ordersHasMore ? '#eef2ff' : '#e2e8f0',
+                                                color: ordersHasMore ? '#3730a3' : '#64748b',
+                                                cursor: ordersHasMore ? 'pointer' : 'not-allowed',
+                                                opacity: ordersHasMore ? 1 : 0.7
+                                            }}
+                                            title={ordersHasMore ? 'Carregar mais pedidos históricos' : 'Todos os pedidos disponíveis já foram carregados para o recorte atual'}
+                                        >
+                                            Carregar +50 (atual: {ordersPageSize})
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             <div style={{ overflowX: 'auto' }} className="hide-scrollbar">
@@ -8237,7 +8462,7 @@ function DriversTab({ allOrders = [], campaigns = [] }) {
     );
 }
 
-const BrandLogo = (window.HeloComponents && window.HeloComponents.BrandLogo)
+var BrandLogo = (window.HeloComponents && window.HeloComponents.BrandLogo)
     ? window.HeloComponents.BrandLogo
     : React.memo(({ scale = 1, offsetY = 0 }) => (
         <div className="brand-mark-wrap" style={{ transform: `translateY(${offsetY}px) scale(${scale})`, transformOrigin: 'center center' }}>
@@ -8249,7 +8474,7 @@ const BrandLogo = (window.HeloComponents && window.HeloComponents.BrandLogo)
         </div>
     ));
 
-const Cabecalho = (window.HeloComponents && window.HeloComponents.Cabecalho)
+var Cabecalho = (window.HeloComponents && window.HeloComponents.Cabecalho)
     ? window.HeloComponents.Cabecalho
     : React.memo(({ cart, onOpenCart }) => {
         const cartCount = cart.reduce((acc, item) => acc + (Number(item?.qty) || 0), 0);
@@ -8267,9 +8492,9 @@ const Cabecalho = (window.HeloComponents && window.HeloComponents.Cabecalho)
         );
     });
 
-const RodapeSite = (window.HeloComponents && window.HeloComponents.RodapeSite)
+var RodapeSite = (window.HeloComponents && window.HeloComponents.RodapeSite)
     ? window.HeloComponents.RodapeSite
-    : React.memo(({ onOpenLogin, operationDays = 'Quarta a domingo', operationHours = '14:00hrs às 20hrs' }) => (
+    : React.memo(({ onOpenLogin, operationDays = 'Quarta a domingo', operationHours = '14:30hrs às 20hrs' }) => (
         <footer style={{ marginTop: 'auto', background: 'var(--primary)', paddingTop: '2.4rem', paddingBottom: '1.4rem', borderTop: '6px solid var(--cream)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, padding: '2.5rem', opacity: .05, transform: 'rotate(12deg)', pointerEvents: 'none' }}>
                 <i className="ph-fill ph-crown" style={{ fontSize: '200px', color: 'var(--cream)' }}></i>
@@ -8327,7 +8552,7 @@ const RodapeSite = (window.HeloComponents && window.HeloComponents.RodapeSite)
         </footer>
     ));
 
-const VitrineProdutos = (window.HeloComponents && window.HeloComponents.VitrineProdutos)
+var VitrineProdutos = (window.HeloComponents && window.HeloComponents.VitrineProdutos)
     ? ((props) => {
         const ExternalVitrineProdutos = window.HeloComponents.VitrineProdutos;
         return (
@@ -8691,3 +8916,8 @@ const ProdutoModal = React.memo(({ product, sizeOptions, flavorOptions, onClose,
         </div>
     );
 });
+
+if (typeof window !== 'undefined') {
+    window.FeedbackExperience = FeedbackExperience;
+    window.AdminPanel = AdminPanel;
+}

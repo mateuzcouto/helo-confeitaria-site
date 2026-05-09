@@ -1,74 +1,180 @@
-<!DOCTYPE html>
+<!doctype html>
+<!--
+  Vitrine Pública — Helô Confeitaria
+  Deploy: 09/05/2026 | Versão: 20260509-helofix
+  Arquitetura: Dual-HTML (index.html separado de admin.html)
+  Entrypoint: main-app.js | Bundle: ~30-50KB
+-->
 <html lang="pt-br">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Helô Confeitaria | Pedidos e Gestão Avançada</title>
-    <meta name="deploy-version" content="20260428-000840">
-        <meta name="description" content="Helô Confeitaria: Sistema profissional de pedidos e gestão. Confeitaria e doces artesanais com delivery. Peça pelo WhatsApp, Facebook ou acesse nosso portal de vendas.">
-        <meta name="theme-color" content="#8B4513">
-    
-        <!-- Open Graph (OG) - Compartilhamento em Redes Sociais -->
-        <meta property="og:type" content="business.business">
-        <meta property="og:url" content="https://heloconfeitarianr.web.app/">
-        <meta property="og:title" content="Helô Confeitaria | Doces Artesanais e Confeitaria">
-        <meta property="og:description" content="Descubra nossas deliciosas criações: brownies, bolos de chocolate, red velvet e muito mais. Encomende com facilidade pelo nosso sistema integrado com WhatsApp e Facebook.">
-        <meta property="og:image" content="https://heloconfeitarianr.web.app/share-preview.jpg">
-        <meta property="og:image:secure_url" content="https://heloconfeitarianr.web.app/share-preview.jpg">
-        <meta property="og:image:type" content="image/jpeg">
-        <meta property="og:image:width" content="1200">
-        <meta property="og:image:height" content="630">
-        <meta property="og:image:alt" content="Helô Confeitaria - Doces e Confeitaria Artesanal">
-        <meta property="og:locale" content="pt_BR">
-    
-        <!-- Twitter Cards - Otimização para X (Twitter) -->
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:url" content="https://heloconfeitarianr.web.app/">
-        <meta name="twitter:title" content="Helô Confeitaria | Doces Artesanais">
-        <meta name="twitter:description" content="Doces e confeitaria artesanal. Brownies, bolos gourmet, red velvet. Peça agora pelo WhatsApp ou Facebook. Delivery disponível.">
-        <meta name="twitter:image" content="https://heloconfeitarianr.web.app/share-preview.jpg">
-        <meta name="twitter:image:alt" content="Helô Confeitaria - Doces e Confeitaria Artesanal">
-        <meta name="twitter:creator" content="@heloconfeitaria">
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=20260428-000840">
-    <link rel="alternate icon" type="image/x-icon" href="./favicon.ico?v=20260428-000840">
-    <link rel="shortcut icon" href="./favicon.ico?v=20260428-000840">
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         Otimização de Performance — Preconnect para Firestore
+         Inicia negociação SSL com o Google antes mesmo do JavaScript
+         solicitar os produtos. Reduz latência perceptível no 3G/4G.
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" href="./css/style.css?v=20260509-053850" as="style" />
 
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <meta name="deploy-version" content="20260509-053850" />
+    <meta
+      name="description"
+      content="Helô Confeitaria: Sistema profissional de pedidos e gestão. Confeitaria e doces artesanais com delivery. Peça pelo WhatsApp, Facebook ou acesse nosso portal de vendas."
+    />
+    <meta name="theme-color" content="#8B4513" />
+
+    <!-- Open Graph (OG) - Compartilhamento em Redes Sociais -->
+    <meta property="og:type" content="business.business" />
+    <meta property="og:url" content="https://heloconfeitarianr.web.app/" />
+    <meta
+      property="og:title"
+      content="Helô Confeitaria | Doces Artesanais e Confeitaria"
+    />
+    <meta
+      property="og:description"
+      content="Descubra nossas deliciosas criações: brownies, bolos de chocolate, red velvet e muito mais. Encomende com facilidade pelo nosso sistema integrado com WhatsApp e Facebook."
+    />
+    <meta
+      property="og:image"
+      content="https://heloconfeitarianr.web.app/share-preview.jpg"
+    />
+    <meta
+      property="og:image:secure_url"
+      content="https://heloconfeitarianr.web.app/share-preview.jpg"
+    />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Helô Confeitaria - Doces e Confeitaria Artesanal"
+    />
+    <meta property="og:locale" content="pt_BR" />
+
+    <!-- Twitter Cards - Otimização para X (Twitter) -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://heloconfeitarianr.web.app/" />
+    <meta name="twitter:title" content="Helô Confeitaria | Doces Artesanais" />
+    <meta
+      name="twitter:description"
+      content="Doces e confeitaria artesanal. Brownies, bolos gourmet, red velvet. Peça agora pelo WhatsApp ou Facebook. Delivery disponível."
+    />
+    <meta
+      name="twitter:image"
+      content="https://heloconfeitarianr.web.app/share-preview.jpg"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Helô Confeitaria - Doces e Confeitaria Artesanal"
+    />
+    <meta name="twitter:creator" content="@heloconfeitaria" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="./favicon.svg?v=20260509-053850"
+    />
+    <link
+      rel="alternate icon"
+      type="image/x-icon"
+      href="./favicon.ico?v=20260509-053850"
+    />
+    <link rel="shortcut icon" href="./favicon.ico?v=20260509-053850" />
+
+    <script defer src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
     <!-- Bibliotecas do Firebase (Apenas as necessárias para Banco de Dados e Auth) -->
-    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
-    <!-- QZ Tray — impressão térmica local via impressora conectada por cabo -->
-    <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.5/qz-tray.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
+    <!-- QZ Tray removido da vitrine para performance -->
 
-    <link rel="stylesheet" id="app-style" href="./css/style.css?v=20260428-000840">
-</head>
+    <link
+      rel="stylesheet"
+      id="app-style"
+      href="./css/style.css?v=20260509-053850"
+    />
+  </head>
 
-<body>
-    <div id="root"></div>
-    <script src="./js/core/config/app-config.js?v=20260428-000840"></script>
-    <script src="./js/core/utils/text-date-utils.js?v=20260428-000840"></script>
-    <script src="./js/core/campaign/campaign-utils.js?v=20260428-000840"></script>
-    <script src="./js-build/components/brand-logo.component.js?v=20260428-000840"></script>
-    <script src="./js-build/components/cabecalho.component.js?v=20260428-000840"></script>
-    <script src="./js-build/components/rodape-site.component.js?v=20260428-000840"></script>
-    <script src="./js-build/components/product-card.component.js?v=20260428-000840"></script>
-    <script src="./js-build/components/vitrine-produtos.component.js?v=20260428-000840"></script>
-    <script src="./js/app.js?v=20260428-000840"></script>
-    <script src="./js/carrinho.js?v=20260428-000840"></script>
-    <script src="./js/crm.js?v=20260428-000840"></script>
-    <script src="./js/financeiro.js?v=20260428-000840"></script>
-    <script src="./js/estoque.js?v=20260428-000840"></script>
-    <script src="./js-build/core/utils/admin-utils.js?v=20260428-000840"></script>
-    <script src="./js-build/core/catalog.js?v=20260428-000840"></script>
-    <script src="./js-build/script.js?v=20260428-000840"></script>
-    <script src="./js-build/cart-ui.js?v=20260428-000840"></script>
-    <script src="./js-build/ui-shell.js?v=20260428-000840"></script>
-    <script src="./js-build/main-app.js?v=20260428-000840"></script>
-</body>
+  <body>
+    <div id="root">
+      <!-- ═══════════════════════════════════════════════════════════════════════
+           Skeleton Screen (Esqueleto de Carregamento)
+           Este HTML/CSS aparece INSTANTANEAMENTE enquanto o React e o Firebase
+           estão carregando. Evita o "flash" de tela branca.
+           ═══════════════════════════════════════════════════════════════════════ -->
+      <div style="display: flex; flex-direction: column; min-height: 100vh; font-family: 'Inter', sans-serif; background: #fff;">
+        <div style="height: 72px; background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; border-bottom: 1px solid #f1f5f9;">
+          <!-- Logo placeholder — div simples, sem img, para evitar 404 durante skeleton -->
+          <div style="width: 140px; height: 32px; background: linear-gradient(90deg, #f1f5f9, #e8edf3); border-radius: 8px;" aria-hidden="true"></div>
+          <div style="width: 44px; height: 44px; background: #f1f5f9; border-radius: 12px;" aria-hidden="true"></div>
+        </div>
+        <div class="shimmer" style="height: 340px; background: #f8fafc; margin-bottom: 2rem;"></div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 2rem; padding: 0 1.5rem;">
+          <div style="height: 420px; background: #fff; border-radius: 24px; padding: 1.2rem; border: 1px solid #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+            <div style="height: 240px; background: #f1f5f9; border-radius: 16px; margin-bottom: 1.5rem;"></div>
+            <div style="height: 24px; background: #f1f5f9; border-radius: 6px; width: 85%; margin-bottom: 1rem;"></div>
+            <div style="height: 16px; background: #f1f5f9; border-radius: 6px; width: 45%;"></div>
+          </div>
+          <div style="height: 420px; background: #fff; border-radius: 24px; padding: 1.2rem; border: 1px solid #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.02); opacity: 0.6;">
+            <div style="height: 240px; background: #f1f5f9; border-radius: 16px; margin-bottom: 1.5rem;"></div>
+            <div style="height: 24px; background: #f1f5f9; border-radius: 6px; width: 85%; margin-bottom: 1rem;"></div>
+            <div style="height: 16px; background: #f1f5f9; border-radius: 6px; width: 45%;"></div>
+          </div>
+        </div>
+        <style>
+          .shimmer {
+            background: linear-gradient(90deg, #f8fafc 25%, #f1f5f9 50%, #f8fafc 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+          }
+          @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+          }
+        </style>
+      </div>
+    </div>
+    <script defer src="./js-build/components/brand-logo.component.js?v=20260509-053850"></script>
+    <script defer src="./js-build/components/cabecalho.component.js?v=20260509-053850"></script>
+    <script defer src="./js-build/components/rodape-site.component.js?v=20260509-053850"></script>
+    <script defer src="./js-build/components/product-card.component.js?v=20260509-053850"></script>
+    <script defer src="./js-build/components/vitrine-produtos.component.js?v=20260509-053850"></script>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         SCRIPTS DA VITRINE PÚBLICA (Cliente Final)
+         Ordem de dependência (não alterar): js-build/app.js → carrinho →
+         admin-utils → catalog → core-globals → cart-ui → main-app.js
+         main-app é gerado com IIFE próprio (build-public-js) mas ainda exige
+         app.js antes para window.HeloApp. Após deploy, atualizar ?v=20260509-053850 neste HTML.
 
+         IMPORTANTE: Todos em ./js-build/ (transpilados)
+         Browsers não conseguem executar JSX direto.
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <script defer src="./js-build/app.js?v=20260509-053850"></script>
+    <script defer src="./js-build/carrinho.js?v=20260509-053850"></script>
+    <!-- admin-utils.js e catalog.js são dependências compartilhadas usadas
+         tanto pela vitrine quanto pelo painel. Mantidos aqui porque o
+         main-app.js precisa de constantes do catálogo. -->
+    <script defer src="./js-build/core/utils/admin-utils.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core/catalog.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core-globals.js?v=20260509-053850"></script>
+    <script defer src="./js-build/cart-ui.js?v=20260509-053850"></script>
+    <script defer src="./js-build/main-app.js?v=20260509-053850"></script>
+    <!-- Ícones não são críticos para o primeiro render da vitrine -->
+    <script defer src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         NOTA DE ARQUITETURA (Fase 1 — Otimização de Performance):
+         Os seguintes módulos foram REMOVIDOS do index.html pois pertencem
+         exclusivamente ao painel administrativo (admin.html):
+         • crm.js        — Gestão de clientes e agenda
+         • financeiro.js — Lançamentos e relatórios financeiros
+         • estoque.js    — Controle de ingredientes e receitas
+         • script.js     — Painel AdminPanel completo (já removido antes)
+         Isso reduz o bundle baixado pelo cliente em aproximadamente 120KB+.
+         ═══════════════════════════════════════════════════════════════════════ -->
+  </body>
 </html>

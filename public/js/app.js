@@ -62,12 +62,55 @@ window.HeloApp = (() => {
 	   ──────────────────────────────────────────────────────────────── */
 	const auth = firebase.auth();
 	const db = firebase.firestore();
-	/* ── Força long-polling no Firestore ────────────────────────────
-	   Por padrão, o SDK tenta conexão gRPC (Listen/channel) que
-	   retorna 404 em muitos ambientes antes de cair no long-polling.
-	   Forçar long-polling elimina os 404s e funciona em todos os
-	   navegadores, proxies e redes restritas. */
-	db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false, merge: true });
+
+	/* ── Configurações do Firestore — DEVE vir antes de enablePersistence ───
+	   db.settings() só pode ser chamado ANTES de qualquer outra operação
+	   no objeto db (incluindo enablePersistence). Chamar depois lança:
+	   "Firestore has already been started and its settings can no longer be changed"
+	   cacheSizeBytes: CACHE_SIZE_UNLIMITED → nunca descarta o cache local.
+	   experimentalForceLongPolling / experimentalAutoDetectLongPolling:
+	   o Firebase NÃO permite os dois ao mesmo tempo. Para evitar regressão
+	   em cache antigo de config, montamos o objeto dinamicamente e enviamos
+	   apenas uma flag por vez. */
+	const forceLongPolling = coreConfig.experimentalForceLongPolling === true;
+	const autoDetectLongPolling = forceLongPolling
+		? false
+		: coreConfig.experimentalAutoDetectLongPolling !== false;
+	const firestoreSettings = {
+		cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
+		/* Sempre define as duas chaves explicitamente para não herdar
+		   valor de chamada anterior quando houver merge/cache antigo. */
+		experimentalForceLongPolling: forceLongPolling,
+		experimentalAutoDetectLongPolling: forceLongPolling ? false : autoDetectLongPolling,
+		merge: true
+	};
+
+	try {
+		db.settings(firestoreSettings);
+	} catch (error) {
+		/* Não derruba o bootstrap inteiro do app por erro de configuração.
+		   Se settings falhar (ordem/cache/SDK), o site segue com defaults. */
+		console.warn('Firestore settings: aplicacao parcial por compatibilidade.', error);
+	}
+
+	/* ── Persistência Offline (IndexedDB) ────────────────────────────────
+	   @update 2026-05-09: no SDK compat atual, enablePersistence() gera
+	   warning de depreciação (enableIndexedDbPersistence). Para manter
+	   console limpo no ambiente operacional e evitar ruído para o time,
+	   deixamos OFF por padrão e habilitamos só via config explícita.
+	   Isso preserva a operação de pedidos em tempo real sem regressão. */
+	const enableOfflinePersistence = coreConfig.enableOfflinePersistence === true;
+	const useMultiTabPersistence = coreConfig.useMultiTabPersistence === true;
+	if (enableOfflinePersistence) {
+		const persistenceConfig = useMultiTabPersistence ? { synchronizeTabs: true } : undefined;
+		db.enablePersistence(persistenceConfig).catch((err) => {
+			if (err.code === 'failed-precondition') {
+				console.warn('Firestore Persistence: Múltiplas abas abertas — apenas uma usa o cache offline.');
+			} else if (err.code === 'unimplemented') {
+				console.warn('Firestore Persistence: Navegador não suportado (Safari < 15 ou modo privado).');
+			}
+		});
+	}
 
 	/* ══════════════════════════════════════════════════════════════════
 	   HELPERS DE ACESSO AO BANCO — getCol() e getMetaDoc()
@@ -219,6 +262,19 @@ window.HeloApp = (() => {
 	const QZ_SIGN_ALGORITHM = coreConfig.QZ_SIGN_ALGORITHM || 'SHA512';
 
 	/* ══════════════════════════════════════════════════════════════════
+	   IMPRESSÃO TÉRMICA — Configurações padrão e normalização
+	   ══════════════════════════════════════════════════════════════════ */
+	const DEFAULT_THERMAL_PRINT_SETTINGS = coreConfig.DEFAULT_THERMAL_PRINT_SETTINGS || {
+		thermalPrintEnabled: false,
+		thermalPrintAutoOnOrder: false,
+		thermalPrinterName: '',
+		thermalPrintCopies: 1,
+		thermalPrintMode: 'escpos',
+		thermalPrintTicketMode: 'both',
+		thermalPrintBrowserFallback: true
+	};
+
+	/* ══════════════════════════════════════════════════════════════════
 	   UTILITÁRIOS — Funções auxiliares usadas em todo o sistema
 	   ══════════════════════════════════════════════════════════════════
 	   Estas funções são como "ferramentas" que outros arquivos usam.
@@ -245,6 +301,22 @@ window.HeloApp = (() => {
 		if (typeof val === 'object') return fallback;
 		return String(val);
 	});
+
+	const normalizeThermalPrintMode = coreUtils.normalizeThermalPrintMode || ((value) => safeText(value, 'escpos').toLowerCase().trim() === 'browser' ? 'browser' : 'escpos');
+	const normalizeThermalPrintTicketMode = coreUtils.normalizeThermalPrintTicketMode || ((value) => {
+		const mode = safeText(value, 'both').toLowerCase().trim();
+		if (mode === 'kitchen' || mode === 'cashier' || mode === 'both') return mode;
+		return 'both';
+	});
+	const normalizeThermalPrintSettings = coreUtils.normalizeThermalPrintSettings || ((settings = {}) => ({
+		thermalPrintEnabled: settings.thermalPrintEnabled === true,
+		thermalPrintAutoOnOrder: settings.thermalPrintAutoOnOrder !== false,
+		thermalPrinterName: safeText(settings.thermalPrinterName).trim(),
+		thermalPrintCopies: Math.max(1, Math.min(5, Number(settings.thermalPrintCopies) || 1)),
+		thermalPrintMode: normalizeThermalPrintMode(settings.thermalPrintMode),
+		thermalPrintTicketMode: normalizeThermalPrintTicketMode(settings.thermalPrintTicketMode),
+		thermalPrintBrowserFallback: settings.thermalPrintBrowserFallback !== false,
+	}));
 
 	/* ── pad2: Completa número com zero à esquerda ─────────────────────
 	   Ex: pad2(5) → "05", pad2(12) → "12"
@@ -727,6 +799,7 @@ window.HeloApp = (() => {
 		QZ_CERT_ENDPOINT,       /* URL do certificado digital QZ */
 		QZ_SIGN_ENDPOINT,       /* URL de assinatura digital QZ */
 		QZ_SIGN_ALGORITHM,      /* Algoritmo de hash (SHA512) */
+		DEFAULT_THERMAL_PRINT_SETTINGS, /* Configurações padrão de impressão térmica */
 
 		/* ── 3. Utilitários de texto e data ───────────────────────────── */
 		safeText,                       /* Converte valor para texto seguro */
@@ -762,5 +835,8 @@ window.HeloApp = (() => {
 		slugifyCampaignId,               /* Converte nome em ID seguro (slug) */
 		normalizeCampaignDoc,            /* Normaliza documento de campanha completo */
 		campaignBadgeStyle,              /* Estilo visual do badge de campanha */
+		normalizeThermalPrintMode,       /* Normaliza modo de impressão térmica */
+		normalizeThermalPrintTicketMode, /* Normaliza modo de vias do cupom */
+		normalizeThermalPrintSettings,   /* Normaliza todas as conf. de impressão térmica */
 	};
 })();

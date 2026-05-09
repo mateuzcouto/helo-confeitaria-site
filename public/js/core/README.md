@@ -1,4 +1,4 @@
-# Core Frontend - Modularização (Fases 1, 2, 3 e 4)
+# Core Frontend - Modularização (Fases 1, 2, 3, 4, 5 e 6)
 
 Este diretório inicia a modularização profissional do frontend com foco em **segurança de mudança** e **compatibilidade total**.
 
@@ -79,6 +79,57 @@ Este diretório inicia a modularização profissional do frontend com foco em **
 24. Corrigido `scripts/build-public-js.js` para compilar também `public/js/components/*.component.js` para `public/js-build/components/`.
 25. Ajustado `public/index.html` para carregar componentes compilados em `public/js-build/components/` (evitando JSX bruto no browser).
 26. Revalidado com `npm run build:public` (sem erros).
+
+## Fase 2 — Separação Vitrine × Admin (Dual HTML Architecture)
+
+Objetivo: isolar o bundle da vitrine pública do painel administrativo para segurança e performance.
+
+### Arquivos criados/alterados nesta fase
+
+- `public/index.html`
+  - Skeleton screen inline para eliminar flash de tela branca.
+  - Preconnect para Firebase, Google Fonts e Gstatic.
+  - Preload de CSS e bibliotecas React.
+  - Remove módulos exclusivos do admin: `crm.js`, `financeiro.js`, `estoque.js`, `script.js`.
+  - Entrypoint: `main-app.js`.
+
+- `public/admin.html` (novo)
+  - Carrega QZ Tray (impressora térmica) via CDN.
+  - Carrega módulos admin-only: `crm.js`, `financeiro.js`, `estoque.js`, `script.js`.
+  - NÃO carrega componentes de vitrine (`product-card`, `vitrine-produtos`, `chat-widget`), `cart-ui.js`, `main-app.js`.
+  - Entrypoint: `app-admin.js`.
+
+- `public/js/app-admin.js` (novo)
+  - React root exclusivo do painel administrativo.
+  - Centraliza estados, listeners e login do admin.
+  - Renderiza `window.AdminPanel` (vindo de `script.js`) após autenticação.
+
+- `public/js/core-globals.js`
+  - Centraliza desestruturação de todos os módulos `window.Helo*` em variáveis globais.
+  - Carregado após os módulos que expõem APIs e antes dos consumidores (`main-app.js`, `app-admin.js`, `script.js`).
+
+### Registro de ações executadas (Fase 2)
+
+- Criado `public/admin.html` com estrutura própria.
+- Criado `public/js/app-admin.js` como entrypoint do admin.
+- Ajustado `public/index.html` para remover módulos admin-only.
+- Ajustado `public/js/script.js` para usar `var` em declarações conflitantes com `core-globals.js` (namespace conflict fix).
+- Atualizado `scripts/build-public-js.js` para compilar `app-admin.js`.
+- Validado build sem erros.
+
+## Fase 6 — core-globals.js e Ajustes de Namespace
+
+Objetivo: centralizar acesso global a módulos IIFE sem repetir desestruturação em cada consumidor.
+
+### Arquivos criados/alterados nesta fase
+
+- `public/js/core-globals.js`
+  - Desestrutura `window.HeloApp`, `window.HeloCart`, `window.HeloCrm`, `window.HeloFinance`, `window.HeloAdminUtils`, `window.HeloCatalog`, `window.HeloComponents`.
+  - Expõe tudo como `var` no escopo global, permitindo que `main-app.js`, `app-admin.js` e `script.js` usem diretamente (`useState`, `auth`, `fmtBRL`, etc.) sem import.
+
+### Regra crítica de compatibilidade
+
+> Scripts carregados ANTES de `core-globals.js` (como componentes ou `app.js`) devem declarar identificadores com `var` (não `const`/`let`) se `core-globals.js` também vai desestruturá-los. Isso evita `SyntaxError: Identifier has already been declared`.
 
 ## Próxima fase sugerida (baixo risco)
 

@@ -14,12 +14,12 @@
    Props:
    - onOpenLogin    → Função para abrir o modal de login do admin
    - operationDays  → Dias de funcionamento (ex: "Quarta a domingo")
-   - operationHours → Horário de funcionamento (ex: "14:00hrs às 20hrs")
+   - operationHours → Horário de funcionamento (ex: "14:30hrs às 20hrs")
    ═══════════════════════════════════════════════════════════════════════ */
 (function initRodapeSiteComponent(globalScope) {
     'use strict';
 
-    const RodapeSite = React.memo(({ onOpenLogin, operationDays = 'Quarta a domingo', operationHours = '14:00hrs às 20hrs' }) => {
+    const RodapeSite = React.memo(({ onOpenLogin, operationDays = 'Quarta a domingo', operationHours = '14:30hrs às 20hrs' }) => {
 
         /* ══════════════════════════════════════════════════════════════════
            ESTRUTURA DO JSX — Seções do rodapé

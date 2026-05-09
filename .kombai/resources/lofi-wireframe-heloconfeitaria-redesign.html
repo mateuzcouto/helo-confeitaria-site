@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wireframe Redesign — Helô Confeitaria (Vitrine Pública)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Comic Sans MS', 'Chalkboard SE', cursive;
+      background: #f5f5f5;
+      color: #333;
+      font-size: 13px;
+    }
+
+    /* ── Legend bar ───────────────────────────────────────── */
+    .legend-bar {
+      background: #fff;
+      border-bottom: 2px solid #ccc;
+      padding: 10px 20px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .legend-bar h1 { font-size: 15px; color: #000; margin-right: auto; }
+    .badge-reuse { background: #4CAF50; color: #fff; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+    .badge-new   { background: #FF9800; color: #fff; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+    .badge-fix   { background: #e53935; color: #fff; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+
+    /* ── Wireframe shell ──────────────────────────────────── */
+    .wireframe-shell {
+      max-width: 960px;
+      margin: 24px auto;
+      background: #fff;
+      border: 2px solid #333;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    .wf-header {
+      background: #fff;
+      border-bottom: 2px solid #333;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .wf-logo-area {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }
+    .wf-logo-box {
+      width: 120px;
+      height: 44px;
+      background: #e0e0e0;
+      border: 1.5px dashed #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #666;
+      border-radius: 4px;
+    }
+    .wf-tagline-text {
+      font-size: 10px;
+      color: #999;
+      letter-spacing: 1px;
+    }
+    .wf-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .wf-cart-btn {
+      position: relative;
+      background: #ccc;
+      border: 1.5px solid #333;
+      border-radius: 24px;
+      padding: 8px 18px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .wf-cart-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: #333;
+      color: #fff;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: bold;
+    }
+
+    /* ── Hero (compact) ───────────────────────────────────── */
+    .wf-hero {
+      background: #e8e8e8;
+      border-bottom: 2px dashed #bbb;
+      padding: 28px 24px 24px;
+      text-align: center;
+      position: relative;
+    }
+    .wf-hero-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .wf-hero-logo-box {
+      width: 220px;
+      height: 80px;
+      background: #d0d0d0;
+      border: 1.5px dashed #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #555;
+      border-radius: 4px;
+    }
+    .wf-hero-subtitle {
+      font-size: 12px;
+      color: #666;
+      letter-spacing: 2px;
+    }
+    .wf-hero-cta-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 4px;
+    }
+    .wf-btn-primary {
+      background: #555;
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      padding: 10px 22px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .wf-btn-secondary {
+      background: #fff;
+      color: #333;
+      border: 1.5px solid #333;
+      border-radius: 24px;
+      padding: 10px 22px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .wf-hero-note {
+      font-size: 10px;
+      color: #888;
+      margin-top: 2px;
+    }
+    /* Fix badge on hero */
+    .fix-badge-hero {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+
+    /* ── Trust strip ──────────────────────────────────────── */
+    .wf-trust-strip {
+      border-bottom: 2px solid #ccc;
+      padding: 12px 24px;
+      display: flex;
+      gap: 8px;
+      justify-content: space-around;
+      background: #f0f0f0;
+      flex-wrap: wrap;
+    }
+    .wf-trust-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #555;
+    }
+    .wf-trust-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #ccc;
+      border: 1px solid #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    /* ── Sticky search + filter bar ───────────────────────── */
+    .wf-sticky-bar {
+      background: #fff;
+      border-bottom: 2px solid #ccc;
+      padding: 10px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .wf-search-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f0f0f0;
+      border: 1.5px solid #333;
+      border-radius: 24px;
+      padding: 8px 14px;
+      max-width: 480px;
+      margin: 0 auto 10px;
+    }
+    .wf-search-icon { font-size: 14px; color: #666; }
+    .wf-search-input {
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 12px;
+      color: #555;
+      outline: none;
+      flex: 1;
+    }
+    .wf-category-pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .wf-pill {
+      border: 1.5px solid #666;
+      background: #fff;
+      color: #555;
+      border-radius: 24px;
+      padding: 5px 14px;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .wf-pill.active {
+      background: #333;
+      color: #fff;
+      border-color: #333;
+    }
+
+    /* ── Product grid ─────────────────────────────────────── */
+    .wf-catalog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px 8px;
+    }
+    .wf-catalog-title { font-size: 14px; font-weight: bold; color: #333; }
+    .wf-catalog-count { font-size: 11px; color: #888; }
+
+    .wf-product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      padding: 0 24px 24px;
+    }
+    .wf-product-card {
+      background: #fff;
+      border: 1.5px solid #ccc;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    .wf-product-thumb {
+      width: 100%;
+      height: 140px;
+      background: #ddd;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #888;
+      position: relative;
+    }
+    .wf-product-thumb .category-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: #555;
+      color: #fff;
+      font-size: 9px;
+      padding: 2px 8px;
+      border-radius: 24px;
+      text-transform: uppercase;
+    }
+    .wf-product-thumb .unit-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: rgba(255,255,255,0.9);
+      color: #333;
+      font-size: 9px;
+      padding: 2px 8px;
+      border-radius: 24px;
+      border: 1px solid #ccc;
+    }
+    .wf-product-body { padding: 10px 12px 12px; }
+    .wf-product-name { font-size: 13px; font-weight: bold; color: #222; margin-bottom: 3px; }
+    .wf-product-desc { font-size: 10px; color: #888; margin-bottom: 6px; line-height: 1.4; }
+    .wf-product-installments {
+      font-size: 10px;
+      color: #555;
+      background: #f0f8f0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 5px 8px;
+      margin-bottom: 8px;
+    }
+    .wf-product-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #eee;
+      padding-top: 8px;
+      gap: 6px;
+    }
+    .wf-product-price { font-size: 14px; font-weight: bold; color: #333; }
+    .wf-product-details-btn {
+      background: #fff;
+      border: 1.5px solid #bbb;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .wf-product-buy-btn {
+      background: #555;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    /* ── Reuse / Fix component badges ─────────────────────── */
+    .component-wrapper { position: relative; }
+    .badge-tag {
+      position: absolute;
+      top: -10px;
+      right: 4px;
+      color: #fff;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: bold;
+      font-family: Arial, sans-serif;
+      z-index: 20;
+      white-space: nowrap;
+    }
+    .badge-tag.reuse { background: #4CAF50; }
+    .badge-tag.new   { background: #FF9800; }
+    .badge-tag.fix   { background: #e53935; }
+
+    /* ── Policy details section ───────────────────────────── */
+    .wf-policy-section {
+      border-top: 2px solid #ccc;
+      padding: 16px 24px;
+      background: #f9f9f9;
+    }
+    .wf-policy-summary {
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #555;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .wf-policy-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .wf-policy-item {
+      background: #fff;
+      border: 1.5px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .wf-policy-icon-box {
+      width: 30px;
+      height: 30px;
+      background: #ddd;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .wf-policy-item-title { font-size: 11px; font-weight: bold; color: #333; }
+    .wf-policy-item-text  { font-size: 10px; color: #888; margin-top: 2px; line-height: 1.4; }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    .wf-footer {
+      background: #e0e0e0;
+      border-top: 2px solid #333;
+      padding: 20px 24px;
+      text-align: center;
+    }
+    .wf-footer-logo-box {
+      width: 160px;
+      height: 60px;
+      background: #ccc;
+      border: 1.5px dashed #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #666;
+      border-radius: 4px;
+      margin: 0 auto 12px;
+    }
+    .wf-footer-social {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .wf-social-link {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #bbb;
+      border: 1.5px solid #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      text-decoration: none;
+      color: #333;
+      position: relative;
+    }
+    .wf-footer-address { font-size: 11px; color: #666; margin-bottom: 6px; }
+    .wf-footer-hours {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1.5px solid #aaa;
+      border-radius: 24px;
+      padding: 6px 16px;
+      font-size: 11px;
+      color: #555;
+      margin: 6px auto;
+    }
+    .wf-admin-link {
+      margin-top: 12px;
+      font-size: 10px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    /* Fix badge on admin link */
+    .fix-tag {
+      background: #e53935;
+      color: #fff;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: bold;
+      font-family: Arial, sans-serif;
+    }
+
+    /* ── Cart Drawer ──────────────────────────────────────── */
+    .wf-cart-drawer-demo {
+      margin: 32px auto;
+      max-width: 360px;
+      border: 2px dashed #888;
+      border-radius: 6px;
+      padding: 0 0 16px;
+      background: #fff;
+    }
+    .wf-cart-header {
+      background: #e0e0e0;
+      border-bottom: 1.5px solid #ccc;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .wf-cart-header h3 { font-size: 14px; }
+    .wf-close-btn { background: none; border: 1.5px solid #999; border-radius: 50%; width: 28px; height: 28px; font-family: inherit; cursor: pointer; font-size: 14px; }
+    .wf-cart-item { display: flex; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #eee; }
+    .wf-cart-item-thumb { width: 48px; height: 48px; background: #ddd; border: 1px solid #ccc; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #888; }
+    .wf-cart-item-info { flex: 1; }
+    .wf-cart-item-name { font-size: 12px; font-weight: bold; }
+    .wf-cart-item-price { font-size: 11px; color: #555; }
+    .wf-cart-qty { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .wf-qty-btn { width: 22px; height: 22px; border: 1.5px solid #aaa; border-radius: 4px; background: #fff; font-family: inherit; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .wf-qty-val { font-size: 12px; font-weight: bold; }
+    .wf-cart-form { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .wf-input-label { font-size: 10px; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+    .wf-input-field { border: 1.5px solid #ccc; border-radius: 6px; padding: 8px 10px; font-size: 12px; font-family: inherit; width: 100%; }
+    .wf-delivery-toggle { display: flex; gap: 6px; }
+    .wf-toggle-btn { flex: 1; border: 1.5px solid #bbb; border-radius: 6px; padding: 8px; font-family: inherit; font-size: 11px; cursor: pointer; background: #f5f5f5; }
+    .wf-toggle-btn.active { background: #333; color: #fff; border-color: #333; }
+    .wf-cart-summary { padding: 10px 16px; background: #f5f5f5; border-top: 1.5px solid #ccc; display: flex; flex-direction: column; gap: 4px; }
+    .wf-summary-row { display: flex; justify-content: space-between; font-size: 11px; color: #555; }
+    .wf-summary-row.total { font-weight: bold; font-size: 14px; color: #222; margin-top: 4px; border-top: 1px solid #ccc; padding-top: 6px; }
+    .wf-finalize-btn { width: calc(100% - 32px); margin: 12px 16px 0; background: #333; color: #fff; border: none; border-radius: 8px; padding: 14px; font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer; }
+
+    /* ── Improvement note box ─────────────────────────────── */
+    .wf-improvement-note {
+      max-width: 960px;
+      margin: 0 auto 16px;
+      background: #fff8e1;
+      border: 1.5px solid #f9a825;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #555;
+    }
+    .wf-improvement-note h2 { font-size: 13px; color: #333; margin-bottom: 6px; }
+    .wf-improvement-note ul { padding-left: 16px; }
+    .wf-improvement-note li { margin-bottom: 4px; }
+
+    /* ── Section label ────────────────────────────────────── */
+    .wf-section-label {
+      max-width: 960px;
+      margin: 24px auto 8px;
+      font-size: 15px;
+      font-weight: bold;
+      color: #333;
+      border-bottom: 2px dashed #bbb;
+      padding-bottom: 6px;
+    }
+
+    @media (max-width: 600px) {
+      .wf-product-grid { grid-template-columns: repeat(2, 1fr); }
+      .wf-policy-grid { grid-template-columns: 1fr; }
+      .wf-header { flex-wrap: wrap; }
+      .wf-trust-strip { flex-direction: column; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ Legend bar ══════════════════════════════════════════════ -->
+<div class="legend-bar">
+  <h1>Wireframe Redesign — Helô Confeitaria (Vitrine Pública)</h1>
+  <div class="legend-item"><span class="badge-reuse">[REUSE]</span> Existing component reused</div>
+  <div class="legend-item"><span class="badge-new">[NEW]</span> New component needed</div>
+  <div class="legend-item"><span class="badge-fix">[FIX]</span> Accessibility / UX fix applied</div>
+</div>
+
+<!-- ══ Improvement note ════════════════════════════════════════ -->
+<div class="wf-improvement-note">
+  <h2>Key Redesign Changes vs. Current Implementation</h2>
+  <ul>
+    <li><strong>Hero height halved</strong>: Logo + tagline + CTA visible without scrolling on desktop (from ~600px to ~180px).</li>
+    <li><strong>Header bar added</strong>: Persistent logo + cart button replaces the full-page hero, improving navigation on desktop.</li>
+    <li><strong>Trust strip</strong>: 3 key trust items moved to a compact horizontal strip between hero and catalog, maintaining visibility.</li>
+    <li><strong>Sticky search + category bar</strong>: Stays at top while user scrolls through products.</li>
+    <li><strong>Policy details collapsed</strong> under `&lt;details&gt;` (maintained) — but moved below catalog for less friction to products.</li>
+    <li><strong>Accessibility fixes</strong>: aria-labels on all icon-only buttons/links, &lt;main&gt; landmark, &lt;h1&gt;, and higher-contrast active pill.</li>
+  </ul>
+</div>
+
+<!-- ══ Main page wireframe ═════════════════════════════════════ -->
+<div class="wf-section-label">📄 Page Layout (Desktop ~1280px)</div>
+<div class="wireframe-shell">
+
+  <!-- ── HEADER (new) ────────────────────────────────────────── -->
+  <!-- NEW COMPONENT: SiteHeader — persistent top bar -->
+  <div class="component-wrapper">
+    <span class="badge-tag new" title="New: SiteHeader component">[NEW] SiteHeader</span>
+    <header class="wf-header" role="banner">
+      <div class="wf-logo-area">
+        <!-- REUSABLE: BrandLogo from js-build/components/brand-logo.component.js -->
+        <div class="component-wrapper" style="display:inline-block;">
+          <span class="badge-tag reuse" title="js-build/components/brand-logo.component.js">[REUSE] BrandLogo</span>
+          <div class="wf-logo-box">[ Logo Helô ]</div>
+        </div>
+        <span class="wf-tagline-text">Adoçando momentos especiais</span>
+      </div>
+
+      <nav aria-label="Redes sociais" style="display:flex; gap:6px;">
+        <!-- FIX: aria-label added to all social links -->
+        <div class="component-wrapper">
+          <span class="badge-tag fix" title="FIX: add aria-label='Instagram'">[FIX] aria-label</span>
+          <a class="wf-social-link" href="#" aria-label="Instagram">📷</a>
+        </div>
+        <a class="wf-social-link" href="#" aria-label="TikTok">🎵</a>
+        <a class="wf-social-link" href="#" aria-label="WhatsApp">💬</a>
+      </nav>
+
+      <!-- REUSABLE: floating cart logic reused, now in header -->
+      <div class="component-wrapper">
+        <span class="badge-tag reuse" title="js-build/cart-ui.js — CartButton">[REUSE] CartButton</span>
+        <button class="wf-cart-btn" aria-label="Ver carrinho (2 itens)">
+          🛒 Carrinho
+          <div class="wf-cart-badge">2</div>
+        </button>
+      </div>
+    </header>
+  </div>
+
+  <!-- ── HERO (compact redesign) ──────────────────────────────── -->
+  <!-- REUSABLE: hero-section + brand-logo-image (CSS classes kept, height reduced) -->
+  <div class="component-wrapper">
+    <span class="badge-tag fix" title="FIX: Reduce hero height from 600px to ~160px, add H1 and CTA above fold">[FIX] Hero Height + H1</span>
+    <section class="wf-hero" aria-label="Topo da vitrine">
+      <div class="wf-hero-inner">
+        <div class="wf-hero-logo-box">[ LOGO HELÔ.png — max-height: 160px ]</div>
+        <!-- FIX: Add H1 for SEO and accessibility -->
+        <h1 class="wf-hero-subtitle">[ H1: "Helô Confeitaria — Doces Artesanais" ]</h1>
+        <div class="wf-hero-cta-row">
+          <button class="wf-btn-primary">Ver produtos ↓</button>
+          <button class="wf-btn-secondary">💬 Pedir pelo WhatsApp</button>
+        </div>
+        <p class="wf-hero-note">[ Tagline animada: "Adoçando momentos especiais" ]</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── TRUST STRIP (compact horizontal) ─────────────────────── -->
+  <!-- REUSABLE: policy-highlight-item CSS classes + Phosphor icons -->
+  <div class="component-wrapper">
+    <span class="badge-tag new" title="NEW: TrustStrip — extracted from policy banner, shown above fold">[NEW] TrustStrip</span>
+    <div class="wf-trust-strip" role="list" aria-label="Diferenciais">
+      <div class="wf-trust-item" role="listitem">
+        <div class="wf-trust-icon">✅</div>
+        <div>
+          <div style="font-weight:bold; font-size:11px;">Artesanal premium</div>
+          <div style="font-size:10px; color:#888;">Feito sob encomenda</div>
+        </div>
+      </div>
+      <div class="wf-trust-item" role="listitem">
+        <div class="wf-trust-icon">🚚</div>
+        <div>
+          <div style="font-weight:bold; font-size:11px;">Entrega ou retirada</div>
+          <div style="font-size:10px; color:#888;">Taxa fixa R$ 2,00</div>
+        </div>
+      </div>
+      <div class="wf-trust-item" role="listitem">
+        <div class="wf-trust-icon">💬</div>
+        <div>
+          <div style="font-weight:bold; font-size:11px;">WhatsApp direto</div>
+          <div style="font-size:10px; color:#888;">Atendimento personalizado</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STICKY SEARCH + CATEGORY BAR ─────────────────────────── -->
+  <!-- REUSABLE: search-shell + category-pill CSS classes, input -->
+  <div class="component-wrapper">
+    <span class="badge-tag fix" title="FIX: Sticky search bar + accessible label for input; higher contrast active pill">[FIX] Sticky + a11y</span>
+    <div class="wf-sticky-bar" role="search">
+      <!-- FIX: Add aria-label to search input -->
+      <div class="wf-search-row">
+        <span class="wf-search-icon" aria-hidden="true">🔍</span>
+        <input class="wf-search-input" placeholder="Procurar um sabor..." aria-label="Procurar produto por sabor" />
+      </div>
+      <div class="wf-category-pills" role="list" aria-label="Filtrar por categoria">
+        <!-- FIX: active pill uses dark background (#333) for sufficient contrast instead of gold on blue-gray -->
+        <button class="wf-pill active" role="listitem" aria-pressed="true">Todas as categorias</button>
+        <button class="wf-pill" role="listitem" aria-pressed="false">Fatias de Bolo</button>
+        <button class="wf-pill" role="listitem" aria-pressed="false">Nossos Doces</button>
+        <button class="wf-pill" role="listitem" aria-pressed="false">Bebidas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CATALOG SECTION ───────────────────────────────────────── -->
+  <!-- REUSABLE: VitrineProdutos + ProductCard components -->
+  <main id="main-content" aria-label="Vitrine de produtos">
+    <div class="wf-catalog-header">
+      <h2 class="wf-catalog-title">Vitrine completa</h2>
+      <span class="wf-catalog-count">3 item(ns)</span>
+    </div>
+
+    <div class="wf-product-grid">
+
+      <!-- Product Card 1 -->
+      <!-- REUSABLE: ProductCard from js-build/components/product-card.component.js -->
+      <div class="component-wrapper">
+        <span class="badge-tag reuse" title="js-build/components/product-card.component.js">[REUSE] ProductCard</span>
+        <article class="wf-product-card">
+          <div class="wf-product-thumb">
+            [ Img: 200×140 ]
+            <span class="category-badge">Nossos Doces</span>
+            <span class="unit-badge">Unidade</span>
+          </div>
+          <div class="wf-product-body">
+            <h3 class="wf-product-name">Cookies de Nutella</h3>
+            <p class="wf-product-desc">Unidade</p>
+            <div class="wf-product-installments">Ou até 3x: 3x de R$ 6,39 no cartão</div>
+            <div class="wf-product-actions">
+              <span class="wf-product-price">R$ 18,00</span>
+              <!-- FIX: carousel prev/next buttons get aria-label -->
+              <button class="wf-product-details-btn" aria-label="Ver detalhes de Cookies de Nutella">👁 Detalhes</button>
+              <button class="wf-product-buy-btn" aria-label="Adicionar Cookies de Nutella ao carrinho">+ Comprar</button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- Product Card 2 -->
+      <div class="component-wrapper">
+        <span class="badge-tag reuse" title="js-build/components/product-card.component.js">[REUSE] ProductCard</span>
+        <article class="wf-product-card">
+          <div class="wf-product-thumb">
+            [ Img: 200×140 ]
+            <span class="category-badge">Fatias de Bolo</span>
+            <span class="unit-badge">Unidade</span>
+          </div>
+          <div class="wf-product-body">
+            <h3 class="wf-product-name">Fatias de Ouro Branco</h3>
+            <p class="wf-product-desc">Unidade</p>
+            <div class="wf-product-installments">Ou até 3x: 3x de R$ 6,39 no cartão</div>
+            <div class="wf-product-actions">
+              <span class="wf-product-price">R$ 18,00</span>
+              <button class="wf-product-details-btn" aria-label="Ver detalhes de Fatias de Ouro Branco">👁 Detalhes</button>
+              <button class="wf-product-buy-btn" aria-label="Adicionar Fatias de Ouro Branco ao carrinho">+ Comprar</button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- Product Card 3 — with image carousel -->
+      <div class="component-wrapper">
+        <span class="badge-tag reuse" title="js-build/components/product-card.component.js">[REUSE] ProductCard</span>
+        <article class="wf-product-card">
+          <div class="wf-product-thumb" style="position:relative;">
+            [ Img: 200×140 ] (1/2)
+            <span class="category-badge">Bebidas</span>
+            <span class="unit-badge">Unidade</span>
+            <!-- FIX: Image carousel nav buttons with aria-label -->
+            <div style="position:absolute; bottom:8px; left:0; right:0; display:flex; justify-content:space-between; padding:0 6px;">
+              <button class="wf-product-details-btn" style="width:26px;height:26px;padding:0;" aria-label="Imagem anterior">‹</button>
+              <button class="wf-product-details-btn" style="width:26px;height:26px;padding:0;" aria-label="Próxima imagem">›</button>
+            </div>
+            <!-- FIX: Carousel dot indicators with aria-label -->
+            <div style="position:absolute; bottom:4px; left:50%; transform:translateX(-50%); display:flex; gap:4px;">
+              <div class="component-wrapper" style="display:inline-block;">
+                <span class="badge-tag fix" style="top:-14px; right:-4px;" title="FIX: carousel dots need aria-label">[FIX]</span>
+                <button style="width:10px;height:6px;border-radius:3px;background:#333;border:none;padding:0;" aria-label="Ir para imagem 1"></button>
+              </div>
+              <button style="width:6px;height:6px;border-radius:3px;background:#999;border:none;padding:0;" aria-label="Ir para imagem 2"></button>
+            </div>
+          </div>
+          <div class="wf-product-body">
+            <h3 class="wf-product-name">Refrigerante Coca Cola Zero 600ml</h3>
+            <p class="wf-product-desc">Unidade</p>
+            <div class="wf-product-installments">Ou até 3x: 3x de R$ 2,31 no cartão</div>
+            <div class="wf-product-actions">
+              <span class="wf-product-price">R$ 6,50</span>
+              <button class="wf-product-details-btn" aria-label="Ver detalhes">👁</button>
+              <button class="wf-product-buy-btn" aria-label="Adicionar ao carrinho">+ Comprar</button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+    </div><!-- /product grid -->
+
+    <!-- ── POLICY details (moved below catalog) ──────────────── -->
+    <!-- REUSABLE: policy-banner CSS + details/summary element -->
+    <div class="component-wrapper" style="padding:0 24px 24px;">
+      <span class="badge-tag reuse" title="policy-banner CSS classes + details/summary">[REUSE] PolicyBanner</span>
+      <div class="wf-policy-section">
+        <details>
+          <summary class="wf-policy-summary">📋 Como funciona o pedido — ver políticas +</summary>
+          <div class="wf-policy-grid">
+            <div class="wf-policy-item">
+              <div class="wf-policy-icon-box">📅</div>
+              <div>
+                <div class="wf-policy-item-title">Encomendas maiores</div>
+                <div class="wf-policy-item-text">Bolos de festa precisam de antecedência.</div>
+              </div>
+            </div>
+            <div class="wf-policy-item">
+              <div class="wf-policy-icon-box">📍</div>
+              <div>
+                <div class="wf-policy-item-title">Retirada agendada</div>
+                <div class="wf-policy-item-text">Horário combinado previamente.</div>
+              </div>
+            </div>
+            <div class="wf-policy-item">
+              <div class="wf-policy-icon-box">↩️</div>
+              <div>
+                <div class="wf-policy-item-title">Cancelamentos</div>
+                <div class="wf-policy-item-text">Crédito válido por 2 meses se cancelar em 3 dias.</div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+  </main><!-- /main -->
+
+  <!-- ── FOOTER ────────────────────────────────────────────────── -->
+  <!-- REUSABLE: rodape-site.component.js -->
+  <div class="component-wrapper">
+    <span class="badge-tag reuse" title="js-build/components/rodape-site.component.js">[REUSE] Rodapé</span>
+    <footer class="wf-footer" role="contentinfo">
+      <div class="wf-footer-logo-box">[ Logo Helô — rodapé ]</div>
+      <div class="wf-footer-social" role="list" aria-label="Redes sociais">
+        <!-- FIX: social links all get aria-label -->
+        <a class="wf-social-link" href="#" aria-label="Instagram da Helô Confeitaria" role="listitem">📷</a>
+        <a class="wf-social-link" href="#" aria-label="TikTok da Helô Confeitaria" role="listitem">🎵</a>
+        <a class="wf-social-link" href="#" aria-label="WhatsApp da Helô Confeitaria" role="listitem">💬</a>
+      </div>
+      <p class="wf-footer-address">📍 Rua Anastácio Paulo de Sousa, 63 — Nova Aldeota</p>
+      <p class="wf-footer-address">📞 (88) 98157-7625</p>
+      <div class="wf-footer-hours">
+        🕐 Quarta a domingo — 14:00hrs às 20hrs
+      </div>
+      <div class="wf-admin-link">
+        <!-- FIX: Increase contrast on admin link text -->
+        <span class="fix-tag">[FIX] contrast</span>
+        <button style="background:none; border:none; font-family:inherit; font-size:11px; color:#555; cursor:pointer;">🔒 Acesso Reservado</button>
+      </div>
+      <p style="font-size:10px; color:#888; margin-top:8px;">
+        <!-- FIX: Increase contrast on "Feito por Couto" text -->
+        <span class="fix-tag">[FIX] contrast</span>
+        Feito por <span style="font-weight:bold;">Couto</span>
+      </p>
+    </footer>
+  </div>
+
+</div><!-- /wireframe-shell -->
+
+<!-- ══ Cart Drawer (separate demo) ════════════════════════════ -->
+<div class="wf-section-label">🛒 Cart Drawer — Side Panel (exemplo aberto)</div>
+<div class="wf-cart-drawer-demo">
+  <!-- REUSABLE: CarrinhoCompras from js-build/cart-ui.js -->
+  <div class="component-wrapper">
+    <span class="badge-tag reuse" style="top:0; right:4px;" title="js-build/cart-ui.js">[REUSE] CarrinhoCompras</span>
+    <div class="wf-cart-header">
+      <h3>🛒 Pedido (2 itens)</h3>
+      <button class="wf-close-btn" aria-label="Fechar carrinho">✕</button>
+    </div>
+  </div>
+
+  <div class="wf-cart-item">
+    <div class="wf-cart-item-thumb">[ img ]</div>
+    <div class="wf-cart-item-info">
+      <div class="wf-cart-item-name">Cookies de Nutella</div>
+      <div class="wf-cart-item-price">R$ 18,00</div>
+      <div class="wf-cart-qty">
+        <button class="wf-qty-btn" aria-label="Diminuir quantidade">−</button>
+        <span class="wf-qty-val">1</span>
+        <button class="wf-qty-btn" aria-label="Aumentar quantidade">+</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-cart-form">
+    <span class="wf-input-label">Nome</span>
+    <input class="wf-input-field" placeholder="Seu nome" aria-label="Seu nome" />
+    <span class="wf-input-label">WhatsApp</span>
+    <input class="wf-input-field" placeholder="(88) 9 0000-0000" aria-label="Número do WhatsApp" />
+    <span class="wf-input-label">Entrega ou retirada?</span>
+    <div class="wf-delivery-toggle">
+      <button class="wf-toggle-btn active">🏠 Retirada</button>
+      <button class="wf-toggle-btn">🚚 Entrega</button>
+    </div>
+    <span class="wf-input-label">Forma de pagamento</span>
+    <div class="wf-delivery-toggle">
+      <button class="wf-toggle-btn">PIX</button>
+      <button class="wf-toggle-btn active">Cartão</button>
+      <button class="wf-toggle-btn">Dinheiro</button>
+    </div>
+    <span class="wf-input-label">Observações</span>
+    <input class="wf-input-field" placeholder="Personalizações, alergias..." aria-label="Observações do pedido" />
+  </div>
+
+  <div class="wf-cart-summary">
+    <div class="wf-summary-row"><span>Subtotal</span><span>R$ 18,00</span></div>
+    <div class="wf-summary-row"><span>Entrega</span><span>Retirada</span></div>
+    <div class="wf-summary-row total"><span>Total</span><span>R$ 18,00</span></div>
+  </div>
+
+  <button class="wf-finalize-btn" aria-label="Finalizar pedido via WhatsApp">📨 Finalizar Pedido (WhatsApp)</button>
+</div>
+
+<div style="height: 60px;"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MOBILE WIREFRAME — iPhone 14 Pro (393×852) — BEFORE vs AFTER
+     ══════════════════════════════════════════════════════════════════ -->
+<div style="max-width:960px;margin:0 auto 40px;padding:0 20px;">
+  <h2 style="font-family:'Comic Sans MS',cursive;font-size:18px;color:#000;border-top:3px solid #333;padding-top:20px;margin-bottom:6px;">
+    📱 Mobile View — Before vs After (393×852px · iPhone 14 Pro)
+  </h2>
+  <p style="font-size:12px;color:#555;margin-bottom:24px;font-family:'Comic Sans MS',cursive;">
+    Issues confirmed by live measurement: hero=379px (44.5% of viewport), searchShell.top=867px (15px below fold),
+    category pill height=34px, details btn=38px, no safe-area insets, Safari auto-zoom on 14px inputs.
+  </p>
+
+  <div style="display:flex;gap:32px;align-items:flex-start;flex-wrap:wrap;">
+
+    <!-- BEFORE phone -->
+    <div style="flex:0 0 auto;">
+      <p style="font-family:'Comic Sans MS',cursive;font-size:13px;font-weight:bold;text-align:center;margin-bottom:8px;color:#c00;">
+        ❌ BEFORE (current)
+      </p>
+      <!-- phone frame -->
+      <div style="width:200px;background:#fff;border:3px solid #333;border-radius:24px;overflow:hidden;position:relative;box-shadow:4px 4px 0 #aaa;">
+        <!-- status bar -->
+        <div style="height:14px;background:#eee;border-bottom:1px solid #ccc;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;font-family:'Comic Sans MS',cursive;">9:41 ••••</div>
+        <!-- viewport = 852px scale to 320px: ratio ~0.375 -->
+        <!-- hero section: 379px * 0.375 = 142px -->
+        <div style="background:#2a3d5d;padding:8px 10px;height:142px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+          <div style="background:#ccc;width:60px;height:36px;border-radius:4px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#555;">LOGO</div>
+          <div style="color:#e6c794;font-size:7px;text-align:center;letter-spacing:1px;">Adoçando momentos especiais</div>
+          <!-- fold line -->
+          <div style="position:absolute;bottom:0;left:0;right:0;border-top:2px dashed #e53935;font-size:7px;color:#e53935;text-align:right;padding-right:3px;background:rgba(229,57,53,0.08);">← FOLD (44.5% wasted)</div>
+        </div>
+        <!-- below fold: policy, search, products -->
+        <div style="background:#1c2b44;padding:6px 6px 4px;border-top:1px solid rgba(243,212,148,.2);">
+          <div style="color:#f3d494;font-size:6px;font-weight:bold;text-transform:uppercase;margin-bottom:3px;">Como funciona seu pedido</div>
+          <div style="background:rgba(255,255,255,.07);border-radius:4px;padding:4px;margin-bottom:3px;">
+            <div style="background:#ccc;width:12px;height:12px;border-radius:50%;display:inline-block;vertical-align:middle;"></div>
+            <span style="font-size:6px;color:#f3d494;margin-left:3px;">Artesanal premium...</span>
+          </div>
+          <div style="background:rgba(255,255,255,.07);border-radius:4px;padding:4px;margin-bottom:3px;">
+            <div style="background:#ccc;width:12px;height:12px;border-radius:50%;display:inline-block;vertical-align:middle;"></div>
+            <span style="font-size:6px;color:#f3d494;margin-left:3px;">Entrega ou retirada...</span>
+          </div>
+          <div style="background:rgba(255,255,255,.07);border-radius:4px;padding:4px;">
+            <div style="background:#ccc;width:12px;height:12px;border-radius:50%;display:inline-block;vertical-align:middle;"></div>
+            <span style="font-size:6px;color:#f3d494;margin-left:3px;">WhatsApp...</span>
+          </div>
+        </div>
+        <!-- fold 2: search is below viewport -->
+        <div style="padding:4px 6px;background:#2a3d5d;border-top:1px solid #3a527e;opacity:0.4;">
+          <div style="background:#1c2b44;border:1px solid rgba(243,212,148,.5);border-radius:20px;padding:3px 8px;font-size:6px;color:#f3d494;">🔍 Procurar um sabor...</div>
+        </div>
+        <!-- note -->
+        <div style="background:#fff3cd;padding:4px 6px;font-size:6.5px;color:#c00;text-align:center;border-top:1px dashed #c00;">
+          ⚠️ Search &amp; products hidden — user must scroll
+        </div>
+        <!-- home bar area -->
+        <div style="height:10px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;">
+          <div style="width:40px;height:3px;background:#999;border-radius:2px;"></div>
+        </div>
+        <!-- home bar warning -->
+        <div style="background:#fde8e8;padding:2px 4px;font-size:6px;color:#c00;text-align:center;">⚠️ FAB cart btn under home bar</div>
+      </div>
+    </div>
+
+    <!-- arrow -->
+    <div style="flex:0 0 auto;display:flex;align-items:center;padding-top:80px;">
+      <span style="font-size:28px;">→</span>
+    </div>
+
+    <!-- AFTER phone -->
+    <div style="flex:0 0 auto;">
+      <p style="font-family:'Comic Sans MS',cursive;font-size:13px;font-weight:bold;text-align:center;margin-bottom:8px;color:#2e7d32;">
+        ✅ AFTER (suggested)
+      </p>
+      <!-- phone frame -->
+      <div style="width:200px;background:#fff;border:3px solid #333;border-radius:24px;overflow:hidden;position:relative;box-shadow:4px 4px 0 #aaa;">
+        <!-- status bar -->
+        <div style="height:14px;background:#1c2638;border-bottom:1px solid #000;display:flex;align-items:center;justify-content:center;font-size:8px;color:#f3d494;font-family:'Comic Sans MS',cursive;">9:41 ••••</div>
+        <!-- compact hero: 120px instead of 142 -->
+        <div style="background:#2a3d5d;padding:8px 10px 4px;height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+          <div style="background:#ccc;width:60px;height:28px;border-radius:4px;margin-bottom:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#555;">LOGO</div>
+          <div style="color:#e6c794;font-size:6px;text-align:center;letter-spacing:1px;">Adoçando momentos especiais</div>
+        </div>
+        <!-- sticky search bar directly below hero -->
+        <div style="background:#1c2638;padding:4px 6px;border-top:1px solid rgba(243,212,148,.3);position:sticky;top:0;z-index:10;">
+          <div style="background:#243448;border:1px solid rgba(243,212,148,.5);border-radius:20px;padding:4px 8px;font-size:6.5px;color:#f3d494;display:flex;align-items:center;gap:3px;">
+            <span>🔍</span> Procurar um sabor...
+          </div>
+        </div>
+        <!-- category pills with adequate height -->
+        <div style="background:#2a3d5d;padding:4px 6px;display:flex;gap:3px;flex-wrap:wrap;">
+          <div style="background:#fff;border:1px solid #cdd8ec;border-radius:20px;padding:4px 8px;font-size:6px;color:#2a3d5d;font-weight:bold;">Todas</div>
+          <div style="background:rgba(135,95,0,.11);border:1px solid #875f00;border-radius:20px;padding:4px 8px;font-size:6px;color:#875f00;font-weight:bold;">Fatias</div>
+          <div style="background:#fff;border:1px solid #cdd8ec;border-radius:20px;padding:4px 8px;font-size:6px;color:#2a3d5d;font-weight:bold;">Doces</div>
+        </div>
+        <!-- product cards visible immediately -->
+        <div style="background:#2a3d5d;padding:4px 6px;display:flex;flex-direction:column;gap:4px;">
+          <!-- card 1 -->
+          <div style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+            <div style="background:#ddd;height:36px;display:flex;align-items:center;justify-content:center;font-size:7px;color:#888;">[ product image ]</div>
+            <div style="padding:4px 5px;">
+              <div style="font-size:7px;font-weight:bold;color:#000;margin-bottom:2px;">Cookies de Nutella</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f1f5f9;padding-top:3px;margin-top:2px;">
+                <span style="font-size:7px;font-weight:bold;color:#875f00;">R$ 18,00</span>
+                <div style="display:flex;gap:2px;">
+                  <!-- details btn: 16×16 = 44px in real proportions -->
+                  <div style="width:11px;height:11px;background:#fff;border:1px solid #dbe4f5;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:6px;">👁</div>
+                  <!-- buy btn -->
+                  <div style="background:linear-gradient(135deg,#bf8d29,#875f00);border-radius:3px;padding:2px 5px;font-size:6px;color:#fff;font-weight:bold;">+ Comprar</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- card 2 -->
+          <div style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;opacity:0.7;">
+            <div style="background:#ddd;height:36px;display:flex;align-items:center;justify-content:center;font-size:7px;color:#888;">[ product image ]</div>
+            <div style="padding:4px 5px;">
+              <div style="font-size:7px;font-weight:bold;color:#000;margin-bottom:2px;">Fatias de Ouro Branco</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f1f5f9;padding-top:3px;margin-top:2px;">
+                <span style="font-size:7px;font-weight:bold;color:#875f00;">R$ 18,00</span>
+                <div style="display:flex;gap:2px;">
+                  <div style="width:11px;height:11px;background:#fff;border:1px solid #dbe4f5;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:6px;">👁</div>
+                  <div style="background:linear-gradient(135deg,#bf8d29,#875f00);border-radius:3px;padding:2px 5px;font-size:6px;color:#fff;font-weight:bold;">+ Comprar</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- FAB cart button with safe area spacing -->
+        <div style="background:#2a3d5d;padding:3px 6px 0;position:relative;min-height:24px;">
+          <div style="position:absolute;right:6px;bottom:16px;width:20px;height:20px;background:linear-gradient(135deg,#c39332,#875f00);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 2px 6px rgba(0,0,0,.4);">🛒</div>
+        </div>
+        <!-- safe area bottom -->
+        <div style="height:14px;background:#2a3d5d;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px;">
+          <div style="width:40px;height:3px;background:rgba(255,255,255,.3);border-radius:2px;"></div>
+        </div>
+        <div style="background:#c8e6c9;padding:2px 4px;font-size:6px;color:#2e7d32;text-align:center;">✅ FAB clear of home bar</div>
+      </div>
+    </div>
+
+    <!-- annotations -->
+    <div style="flex:1;min-width:220px;">
+      <p style="font-family:'Comic Sans MS',cursive;font-size:13px;font-weight:bold;margin-bottom:12px;">Key Mobile Changes</p>
+      <div style="display:flex;flex-direction:column;gap:10px;font-family:'Comic Sans MS',cursive;font-size:11px;">
+        <div style="background:#fff3cd;border:1px solid #ccc;border-radius:4px;padding:8px;">
+          <strong style="color:#c00;">[Issue #24/#25] Hero height</strong><br>
+          Reduce <code>.hero-premium</code> mobile <code>padding-bottom</code> from <code>2.8rem → 0.5rem</code>. Saves ≈40px, moves search bar above the fold.
+        </div>
+        <div style="background:#fce4ec;border:1px solid #ccc;border-radius:4px;padding:8px;">
+          <strong style="color:#c00;">[Issue #28] Safe-area FAB</strong><br>
+          Add <code>viewport-fit=cover</code> to meta viewport.<br>
+          Change: <code>bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px))</code>
+        </div>
+        <div style="background:#e8f5e9;border:1px solid #ccc;border-radius:4px;padding:8px;">
+          <strong style="color:#2e7d32;">[Issue #27] Safari input zoom</strong><br>
+          Set all cart inputs to <code>font-size: 16px</code> to suppress iOS Safari auto-zoom on focus.
+        </div>
+        <div style="background:#e3f2fd;border:1px solid #ccc;border-radius:4px;padding:8px;">
+          <strong style="color:#1565c0;">[Issue #26/#30] Touch targets</strong><br>
+          Category pills: <code>padding: 11px 16px</code> → 44px<br>
+          Details btn: <code>width: 44px; height: 44px</code>
+        </div>
+        <div style="background:#f3e5f5;border:1px solid #ccc;border-radius:4px;padding:8px;">
+          <strong style="color:#6a1b9a;">[Issue #29] Cart scroll bleed</strong><br>
+          Add <code>overscroll-behavior: contain</code> to cart <code>.hide-scrollbar</code> div. Prevents iOS rubber-band scroll from leaking to background page.
+        </div>
+        <div style="background:#fff8e1;border:1px solid #ccc;border-radius:4px;padding:8px;">
+          <strong style="color:#e65100;">[Issue #23/#32] Brand colors</strong><br>
+          Fix <code>theme-color</code>: <code>#8B4513 → #2A3D5D</code><br>
+          Add <code>html { background-color: #2A3D5D }</code> to prevent white overscroll flash.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="height: 40px;"></div>
+</body>
+</html>
+

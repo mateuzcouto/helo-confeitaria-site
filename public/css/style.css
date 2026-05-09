@@ -10,10 +10,13 @@
 
         html {
             -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
             width: 100%;
             max-width: 100%;
             overflow-x: hidden;
             overscroll-behavior-x: none;
+            /* Prevents white overscroll flash on iOS pull-to-refresh */
+            background-color: #2A3D5D;
         }
 
         html,
@@ -32,6 +35,9 @@
         img {
             display: block;
             max-width: 100%;
+            height: auto;
+            image-rendering: -webkit-optimize-contrast;
+            content-visibility: auto;
         }
 
         input,
@@ -53,6 +59,8 @@
 
         body {
             font-family: 'Nunito', 'Plus Jakarta Sans', sans-serif;
+            /* Fundo azul principal do site publico. Para trocar, ajuste tambem
+               .main-content e, se for uma mudanca de identidade, --primary. */
             background-color: #2A3D5D;
             background-image: none;
             color: #2A3D5D;
@@ -89,7 +97,11 @@
 
         /* ── Tokens ── */
         :root {
+            /* Imagem de fundo da marca. Hoje fica desativada com "none".
+               Para usar imagem, coloque algo como url('../fundo-e-laterais-helo.png'). */
             --brand-backdrop-image: none;
+            /* Cor azul principal da identidade visual. Afeta textos, bordas,
+               estados de foco e varias areas do site alem do fundo. */
             --primary: #2A3D5D;
             --blue-mid: #3A527E;
             --cream: #F3D494;
@@ -117,6 +129,8 @@
             width: 100%;
             max-width: 100%;
             overflow-x: hidden;
+            /* Fundo da area publica renderizada pelo React. Mantem o mesmo
+               azul do body para nao aparecerem faixas de outra cor ao rolar. */
             background-color: #2A3D5D;
             background-image: none;
             isolation: isolate;
@@ -299,6 +313,8 @@
             outline: none;
             /* Remove a borda padrão de foco do navegador */
             border: 1px solid #f8fafc;
+            content-visibility: auto;
+            contain-intrinsic-size: 0 420px;
         }
 
         /* Aplica o efeito quando o mouse passa por cima (hover), é focado pelo teclado (focus) ou é tocado na tela (active) */
@@ -560,7 +576,8 @@
         .floating-cart-btn {
             position: fixed;
             right: clamp(0.7rem, 2vw, 1.2rem);
-            bottom: clamp(0.9rem, 2.2vw, 1.4rem);
+            /* iOS safe-area-inset-bottom: keeps the button above the home indicator */
+            bottom: calc(clamp(0.9rem, 2.2vw, 1.4rem) + env(safe-area-inset-bottom, 0px));
             background: linear-gradient(135deg, #c39332 0%, #875f00 100%);
             color: #fff;
             border: 1px solid rgba(255, 238, 205, 0.4);
@@ -621,6 +638,8 @@
             width: 100%;
             max-width: 1400px;
             height: 600px;
+            /* Logo grande do topo da vitrine. Troque o arquivo em public/LOGO HELÔ.png
+               mantendo o mesmo nome, ou altere esta URL para o novo arquivo. */
             background-image: url('../LOGO HELÔ.png?v=20260414-1');
             background-size: contain;
             background-position: center;
@@ -728,6 +747,136 @@
             background-position: center top;
         }
 
+        /* Bloco de confiança da vitrine: poucos argumentos comerciais visíveis e políticas em disclosure. */
+        .policy-heading {
+            max-width: 680px;
+            margin-bottom: 1rem;
+        }
+
+        .policy-eyebrow {
+            color: var(--cream);
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .1em;
+            margin-bottom: .35rem;
+            text-transform: uppercase;
+        }
+
+        .policy-title {
+            color: #fff7dc;
+            font-family: 'Cormorant Garamond', 'Plus Jakarta Sans', serif;
+            font-size: clamp(1.2rem, 3vw, 1.65rem);
+            font-weight: 800;
+            line-height: 1.12;
+        }
+
+        .policy-highlights,
+        .policy-details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .85rem;
+        }
+
+        .policy-highlight-item,
+        .policy-detail-item {
+            display: flex;
+            align-items: flex-start;
+            gap: .75rem;
+            min-width: 0;
+        }
+
+        .policy-highlight-item {
+            padding: .85rem;
+            border-radius: 1.1rem;
+            background: rgba(255, 255, 255, .065);
+            border: 1px solid rgba(243, 212, 148, .18);
+        }
+
+        .policy-detail-item {
+            padding-top: .25rem;
+        }
+
+        .policy-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            color: var(--primary);
+            background: linear-gradient(135deg, #f8e9bd, #cfa860);
+            box-shadow: 0 10px 18px -14px rgba(0, 0, 0, .75);
+        }
+
+        .policy-icon i,
+        .policy-detail-item > i {
+            font-size: 18px;
+        }
+
+        .policy-detail-item > i {
+            color: var(--gold);
+            flex: 0 0 auto;
+            margin-top: 2px;
+        }
+
+        .policy-item-title {
+            color: var(--cream);
+            font-size: 12px;
+            font-weight: 900;
+            line-height: 1.2;
+            margin-bottom: 3px;
+        }
+
+        .policy-item-text {
+            color: rgba(243, 212, 148, .9);
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .policy-details {
+            margin-top: .9rem;
+            border-top: 1px solid rgba(243, 212, 148, .18);
+            padding-top: .85rem;
+        }
+
+        .policy-details summary {
+            color: #fff7dc;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 900;
+            list-style: none;
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+        }
+
+        .policy-details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .policy-details summary::after {
+            content: '+';
+            width: 20px;
+            height: 20px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(243, 212, 148, .15);
+            color: var(--cream);
+            font-weight: 900;
+        }
+
+        .policy-details[open] summary {
+            margin-bottom: .85rem;
+        }
+
+        .policy-details[open] summary::after {
+            content: '-';
+        }
+
         .search-shell {
             grid-column: 1/-1;
             max-width: 33rem;
@@ -749,7 +898,9 @@
             background: #fff;
             color: var(--primary);
             border-radius: 9999px;
-            padding: 8px 14px;
+            /* min 44px touch target per WCAG 2.5.5 */
+            padding: 11px 16px;
+            min-height: 44px;
             font-size: 12px;
             font-weight: 800;
             cursor: pointer;
@@ -842,6 +993,75 @@
             color: #000;
         }
 
+        .product-card-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            /* Permite quebrar dentro do card quando preço/botões não cabem na mesma linha. */
+            flex-wrap: wrap;
+            gap: 8px;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 1rem;
+            min-width: 0;
+        }
+
+        .product-card-price {
+            color: var(--gold);
+            font-size: 1.25rem;
+            font-weight: 900;
+            line-height: 1;
+            white-space: nowrap;
+            flex: 0 0 auto;
+        }
+
+        .product-card-price.is-muted {
+            color: #94a3b8;
+        }
+
+        .product-card-price.is-consult {
+            color: var(--s400);
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.2;
+            white-space: normal;
+        }
+
+        .product-card-details-btn,
+        .product-card-buy-btn {
+            border-radius: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            line-height: 1;
+            transition: filter .18s ease, transform .18s ease, box-shadow .18s ease;
+            white-space: nowrap;
+        }
+
+        .product-card-details-btn {
+            background: #fff;
+            color: var(--primary);
+            border: 1px solid #dbe4f5;
+            padding: .75rem .65rem;
+            font-size: 11px;
+            font-weight: 750;
+            flex: 0 1 auto;
+        }
+
+        .product-card-buy-btn {
+            padding: .9rem .95rem;
+            font-size: 12px;
+            font-weight: 800;
+            flex: 0 0 auto;
+            margin-left: auto;
+        }
+
+        .product-card-buy-btn:hover,
+        .product-card-buy-btn:focus-visible {
+            box-shadow: 0 18px 28px -18px rgba(135, 95, 0, .95);
+        }
+
         .cart-overlay {
             position: absolute;
             inset: 0;
@@ -904,7 +1124,8 @@
             }
 
             .helo-logo {
-                height: 400px;
+                /* Mobile-first: reduz o topo para a vitrine aparecer mais cedo na primeira rolagem. */
+                height: clamp(220px, 64vw, 280px);
                 max-width: 100%;
             }
 
@@ -973,6 +1194,54 @@
                 padding: 1.4rem;
             }
 
+            .policy-banner {
+                border-radius: 1.25rem;
+                padding: 1rem;
+            }
+
+            .policy-heading {
+                margin-bottom: .85rem;
+            }
+
+            .policy-highlights,
+            .policy-details-grid {
+                grid-template-columns: 1fr;
+                gap: .7rem;
+            }
+
+            .policy-highlight-item {
+                padding: .75rem;
+            }
+
+            .policy-title {
+                font-size: 1.18rem;
+            }
+
+            .product-card-actions {
+                gap: 6px;
+            }
+
+            .product-card-price {
+                font-size: clamp(1rem, 4.5vw, 1.18rem);
+            }
+
+            .product-card-details-btn {
+                /* No mobile, Detalhes vira ação secundária por ícone; Comprar permanece legível. */
+                width: 38px;
+                height: 38px;
+                padding: 0;
+                flex: 0 0 38px;
+            }
+
+            .product-card-details-label {
+                display: none;
+            }
+
+            .product-card-buy-btn {
+                padding: .85rem .8rem;
+                font-size: 12px;
+            }
+
             .main-content::before,
             .main-content::after {
                 width: clamp(24px, 3.6vw, 34px);
@@ -987,3 +1256,255 @@
                 bottom: 0.8rem;
             }
         }
+
+/* ── ChatWidget Styles ─────────────────────────────────────────────────────── */
+.helo-chat-widget {
+    position: fixed;
+    bottom: 5rem;
+    right: 1rem;
+    z-index: 9999;
+    font-family: 'Nunito', sans-serif;
+}
+
+.helo-chat-toggle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #875F00, #B8860B);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(135, 95, 0, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.helo-chat-toggle:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(135, 95, 0, 0.5);
+}
+
+.helo-chat-icon {
+    font-size: 1.8rem;
+}
+
+.helo-chat-window {
+    width: 350px;
+    max-width: calc(100vw - 2rem);
+    height: 500px;
+    max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: heloChatSlideIn 0.3s ease-out;
+}
+
+@keyframes heloChatSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.helo-chat-header {
+    background: linear-gradient(135deg, #875F00, #B8860B);
+    color: #F3D494;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 1rem 1rem 0 0;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.helo-chat-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.helo-chat-avatar {
+    font-size: 1.5rem;
+}
+
+.helo-chat-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: #F3D494;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+
+.helo-chat-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.helo-chat-messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: #faf8f5;
+}
+
+.helo-chat-message {
+    display: flex;
+    max-width: 85%;
+}
+
+.helo-chat-message-user {
+    align-self: flex-end;
+}
+
+.helo-chat-message-assistant {
+    align-self: flex-start;
+}
+
+.helo-chat-bubble {
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    line-height: 1.5;
+    font-size: 0.9rem;
+    word-wrap: break-word;
+}
+
+.helo-chat-message-user .helo-chat-bubble {
+    background: linear-gradient(135deg, #875F00, #B8860B);
+    color: #F3D494;
+    border-radius: 1rem 1rem 0.25rem 1rem;
+}
+
+.helo-chat-message-assistant .helo-chat-bubble {
+    background: #ffffff;
+    color: #333;
+    border: 1px solid #e0d5c5;
+    border-radius: 1rem 1rem 1rem 0.25rem;
+}
+
+.helo-chat-bubble-loading {
+    color: #875F00;
+    font-style: italic;
+}
+
+.helo-chat-input-area {
+    padding: 0.75rem;
+    background: #ffffff;
+    border-top: 1px solid #e0d5c5;
+    display: flex;
+    gap: 0.5rem;
+    border-radius: 0 0 1rem 1rem;
+    flex-shrink: 0;
+}
+
+.helo-chat-textarea {
+    flex: 1;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #d4c4a8;
+    border-radius: 0.75rem;
+    resize: none;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    min-height: 40px;
+    max-height: 100px;
+}
+
+.helo-chat-textarea:focus {
+    border-color: #875F00;
+}
+
+.helo-chat-textarea:disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.helo-chat-send {
+    padding: 0.6rem 1rem;
+    background: linear-gradient(135deg, #875F00, #B8860B);
+    color: #F3D494;
+    border: none;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+
+.helo-chat-send:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.helo-chat-send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Mobile adjustments ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .helo-chat-widget {
+        bottom: 4.5rem;
+        right: 0.5rem;
+    }
+
+    .helo-chat-window {
+        width: calc(100vw - 1rem);
+        height: 90vh;
+        height: 90dvh;
+        max-height: 90vh;
+        max-height: 90dvh;
+        border-radius: 0.75rem;
+    }
+
+    .helo-chat-header {
+        border-radius: 0.75rem 0.75rem 0 0;
+    }
+
+    .helo-chat-input-area {
+        border-radius: 0 0 0.75rem 0.75rem;
+    }
+
+    .helo-chat-toggle {
+        width: 50px;
+        height: 50px;
+    }
+
+    .helo-chat-icon {
+        font-size: 1.5rem;
+    }
+}
+
+/* ── Extra-small screens (keyboard open safety) ────────────────────────── */
+@media (max-width: 768px) and (max-height: 400px) {
+    .helo-chat-window {
+        height: 95vh;
+        height: 95dvh;
+        max-height: 95vh;
+        max-height: 95dvh;
+    }
+}

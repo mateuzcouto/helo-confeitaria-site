@@ -10,6 +10,29 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "emulators": {
+    "hosting": {
+      "port": 5000,
+      "host": "0.0.0.0"
+    },
+    "functions": {
+      "port": 5001,
+      "host": "0.0.0.0"
+    },
+    "firestore": {
+      "port": 8080,
+      "host": "0.0.0.0"
+    },
+    "auth": {
+      "port": 9099,
+      "host": "0.0.0.0"
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true
+  },
   "hosting": {
     "site": "heloconfeitarianr",
     "public": "public",
@@ -76,6 +99,10 @@
       {
         "source": "/api/admin/**",
         "function": "adminClaimApi"
+      },
+      {
+        "source": "/api/groq/**",
+        "function": "groqChat"
       }
     ]
   }

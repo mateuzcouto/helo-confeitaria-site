@@ -34,7 +34,7 @@ window.HeloCart = (() => {
 	   - useCallback → Guarda uma função em cache (evita recriar a cada render)
 	   - useRef      → Guarda um valor que NÃO causa re-render quando muda
 	   ──────────────────────────────────────────────────────────────── */
-	const { useState, useEffect, useMemo, useCallback, useRef } = React;
+	/* React hooks injetados globalmente via core-globals.js */
 
 	/* ── Importação de constantes e funções do app.js ──────────────────
 	   O arquivo app.js (window.HeloApp) centraliza as configurações do

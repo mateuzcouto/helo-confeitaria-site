@@ -60,6 +60,9 @@
         const fmtBRLFn = typeof fmtBRL === 'function'
             ? fmtBRL
             : ((n) => Number(n || 0).toFixed(2).replace('.', ','));
+        const buildResponsiveSourcesFn = typeof window?.HeloCatalog?.buildResponsiveProductImageSources === 'function'
+            ? window.HeloCatalog.buildResponsiveProductImageSources
+            : ((imageUrl) => ({ src: imageUrl, srcSet: '', sizes: '' }));
 
         /* ════════════════════════════════════════════════════════════════
            GALERIA DE IMAGENS — Lista de fotos do produto
@@ -83,6 +86,10 @@
         const [currentImageRatio, setCurrentImageRatio] = React.useState(1);
 
         const total = allImages.length; /* Total de imagens na galeria */
+        const currentImageSources = React.useMemo(() => {
+            const activeImage = allImages[imgIdx] || '';
+            return buildResponsiveSourcesFn(activeImage);
+        }, [allImages, imgIdx, buildResponsiveSourcesFn]);
 
         /* ── Navegação da galeria: anterior e próxima ──────────────────
            % total garante que volta ao início/fim (carousel circular).
@@ -145,7 +152,7 @@
                     </div>
                 )}
                 <div className="thumb" style={{ height: cardImageHeight, borderRadius: '1.2rem', overflow: 'hidden', marginBottom: '0.9rem', position: 'relative', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: cardImagePadding }}>
-                    <img src={allImages[imgIdx]} alt={p.name} loading="lazy" onLoad={(event) => {
+                    <img src={currentImageSources.src || allImages[imgIdx]} srcSet={currentImageSources.srcSet || undefined} sizes={currentImageSources.sizes || undefined} alt={p.name} loading="lazy" decoding="async" fetchpriority="low" onLoad={(event) => {
                         const naturalWidth = event.currentTarget.naturalWidth || 1;
                         const naturalHeight = event.currentTarget.naturalHeight || 1;
                         setCurrentImageRatio(naturalWidth / naturalHeight);
@@ -205,18 +212,20 @@
                         <i className="ph-bold ph-warning" style={{ fontSize: '13px' }}></i> Últimas {normalizedStockLimit} unidade{normalizedStockLimit !== 1 ? 's' : ''}!
                     </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', gap: '8px' }}>
-                    {Number(p.price) > 0 ? <span style={{ fontWeight: '900', color: isOutOfStock ? '#94a3b8' : 'var(--gold)', fontSize: '1.25rem' }}>R$ {fmtBRLFn(p.price)}</span> : <span style={{ fontSize: '11px', color: 'var(--s400)', fontWeight: '600' }}>Consultar preço</span>}
+                {/* Rodapé responsivo do card: preserva o CTA Comprar e compacta Detalhes para evitar overflow em mobile. */}
+                <div className="product-card-actions">
+                    {Number(p.price) > 0 ? <span className={`product-card-price${isOutOfStock ? ' is-muted' : ''}`}>R$ {fmtBRLFn(p.price)}</span> : <span className="product-card-price is-consult">Consultar preço</span>}
                     {isOutOfStock ? (
                         <div style={{ background: '#f1f5f9', color: '#94a3b8', padding: '.9rem 1.1rem', borderRadius: '1rem', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'not-allowed', userSelect: 'none' }}>
                             <i className="ph-bold ph-x-circle" style={{ fontSize: '16px' }}></i> Esgotado
                         </div>
                     ) : (
                         <>
-                            <button onClick={() => onOpenDetails(p)} style={{ background: '#fff', color: 'var(--primary)', padding: '.9rem .85rem', borderRadius: '1rem', border: '1px solid #dbe4f5', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700' }}>
-                                <i className="ph-bold ph-eye" style={{ fontSize: '15px' }}></i> Detalhes
+                            <button onClick={() => onOpenDetails(p)} className="product-card-details-btn">
+                                <i className="ph-bold ph-eye" style={{ fontSize: '15px' }}></i>
+                                <span className="product-card-details-label">Detalhes</span>
                             </button>
-                            <button onClick={() => onAdd(p)} className="cta-gold" style={{ padding: '.9rem .95rem', borderRadius: '1rem', cursor: 'pointer', transition: 'all .15s', lineHeight: 1, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800' }}>
+                            <button onClick={() => onAdd(p)} className="cta-gold product-card-buy-btn">
                                 <i className="ph-bold ph-plus" style={{ fontSize: '16px' }}></i> Comprar
                             </button>
                         </>

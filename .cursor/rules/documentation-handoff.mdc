@@ -1,0 +1,11 @@
+---
+description: Documentar alteracoes no codigo e no README
+alwaysApply: true
+---
+
+# Documentacao obrigatoria de alteracoes
+
+- Sempre que fizer mudanca relevante, registre contexto no codigo (comentario curto no ponto da regra/comportamento).
+- Sempre atualize o `README.md` com o que mudou e com as preferencias/convencoes envolvidas.
+- Em mudancas de UI admin, deixe explicito no codigo e no README o local correto na navegacao (navbar primaria vs tabs secundarias).
+- Nao finalize tarefa com alteracao funcional sem garantir alinhamento entre implementacao e documentacao.

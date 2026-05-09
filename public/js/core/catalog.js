@@ -549,6 +549,89 @@ const normalizarImagensProduto = (produto = {}) => {
     return normalizadas;
 };
 
+/**
+ * Resolve largura-alvo para otimização de imagem conforme viewport atual.
+ *
+ * @param {number} [fallbackWidth=640] - Largura usada quando viewport não está disponível
+ * @returns {number} Largura final em pixels (mínimo 280, máximo 1280)
+ *
+ * Usa janela + devicePixelRatio quando disponível para reduzir payload sem
+ * comprometer nitidez em telas retina.
+ */
+const resolverLarguraOtimizadaImagem = (fallbackWidth = 640) => {
+    if (typeof window === 'undefined') return Math.max(280, Math.min(1280, Math.trunc(Number(fallbackWidth) || 640)));
+    const viewportWidth = Number(window.innerWidth || fallbackWidth || 640);
+    const dpr = Math.max(1, Math.min(2, Number(window.devicePixelRatio || 1)));
+    const larguraBase = viewportWidth * dpr;
+    return Math.max(280, Math.min(1280, Math.trunc(larguraBase)));
+};
+
+/**
+ * Gera URL otimizada quando o host suporta transformação por query/path.
+ *
+ * @param {string} imageUrl - URL original da imagem
+ * @param {Object} [options={}] - Opções de otimização
+ * @param {number} [options.width] - Largura desejada da imagem
+ * @returns {string} URL otimizada ou URL original como fallback seguro
+ *
+ * @update 2026-05-09 — Adiciona redução de payload para vitrine em rede lenta.
+ */
+const otimizarUrlImagemProduto = (imageUrl, options = {}) => {
+    const originalUrl = safeText(imageUrl).trim();
+    if (!originalUrl) return '';
+    if (/^(data:|blob:)/i.test(originalUrl)) return originalUrl;
+
+    const width = resolverLarguraOtimizadaImagem(options.width || 640);
+
+    // Cloudinary: injeta transformações no segmento /upload/.
+    if (originalUrl.includes('res.cloudinary.com') && originalUrl.includes('/upload/')) {
+        return originalUrl.replace('/upload/', `/upload/f_auto,q_auto:eco,c_limit,w_${width},dpr_auto/`);
+    }
+
+    // Unsplash: usa query params oficiais para formato/qualidade/largura.
+    if (originalUrl.includes('images.unsplash.com')) {
+        try {
+            const url = new URL(originalUrl);
+            url.searchParams.set('auto', 'format');
+            url.searchParams.set('fit', 'max');
+            url.searchParams.set('w', String(width));
+            url.searchParams.set('q', '70');
+            return url.toString();
+        } catch (_) {
+            return originalUrl;
+        }
+    }
+
+    // Demais hosts: mantém original para evitar quebra em CDNs sem suporte.
+    return originalUrl;
+};
+
+/**
+ * Monta fontes responsivas (src/srcSet/sizes) com fallback seguro.
+ *
+ * @param {string} imageUrl - URL original da imagem
+ * @returns {{src: string, srcSet: string, sizes: string}} Fontes para tag <img>
+ */
+const construirFontesResponsivasImagemProduto = (imageUrl) => {
+    const originalUrl = safeText(imageUrl).trim();
+    if (!originalUrl) return { src: '', srcSet: '', sizes: '' };
+
+    const breakpoints = [320, 480, 720];
+    const variants = breakpoints
+        .map((width) => ({ width, url: otimizarUrlImagemProduto(originalUrl, { width }) }))
+        .filter((item, index, arr) => item.url && arr.findIndex((candidate) => candidate.url === item.url) === index);
+
+    if (variants.length <= 1) {
+        return { src: variants[0]?.url || originalUrl, srcSet: '', sizes: '' };
+    }
+
+    return {
+        src: variants[1]?.url || variants[0].url,
+        srcSet: variants.map((variant) => `${variant.url} ${variant.width}w`).join(', '),
+        sizes: '(max-width: 600px) 92vw, (max-width: 1024px) 48vw, 360px',
+    };
+};
+
 /* ═══════════════════════════════════════════════════════════════════════
    EXPORTAÇÃO PÚBLICA
    ═══════════════════════════════════════════════════════════════════════ */
@@ -592,6 +675,8 @@ return {
 
     // Imagens
     normalizarImagensProduto,
+    otimizarUrlImagemProduto,
+    construirFontesResponsivasImagemProduto,
 
     // Retrocompatibilidade: nomes antigos que outros módulos já usam
     catLabel: rotuloCategoria,
@@ -614,6 +699,8 @@ return {
     shouldPreferProductCandidate: devePreferirCandidatoProduto,
     dedupeProductsByIdentity: deduplicarProdutosPorIdentidade,
     normalizeProductImages: normalizarImagensProduto,
+    optimizeProductImageUrl: otimizarUrlImagemProduto,
+    buildResponsiveProductImageSources: construirFontesResponsivasImagemProduto,
 };
 
 })();

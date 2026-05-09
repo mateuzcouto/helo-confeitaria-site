@@ -1,4 +1,6 @@
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const admin = require('firebase-admin');
 const { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onRequest } = require('firebase-functions/v2/https');
@@ -7,6 +9,104 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+/* ── Lê base de conhecimento do arquivo markdown ────────────────────────
+   Carrega o conteúdo de BASE_CONHECIMENTO_IA_ATENDIMENTO.md para uso
+   como contexto da IA. Se o arquivo não existir, retorna fallback.
+   
+   @update 2026-04-29 — Criado para leitura dinâmica da base de conhecimento. */
+function loadKnowledgeBase() {
+  try {
+    const knowledgePath = path.join(__dirname, 'BASE_CONHECIMENTO_IA_ATENDIMENTO.md');
+    const content = fs.readFileSync(knowledgePath, 'utf8');
+    return content;
+  } catch (error) {
+    console.error('[groqChat] Failed to load knowledge base file:', error);
+    /* Fallback em caso de erro ao ler arquivo */
+    return `
+# Base de Conhecimento — Helô Confeitaria
+
+Você é um assistente de vendas da Helô Confeitaria. Responda perguntas sobre produtos, pedidos, pagamentos, entrega e políticas.
+
+## Informações Principais
+
+- Site: https://heloconfeitarianr.web.app
+- Chave PIX: [pode alterar dependendo do dia, então verifique no ato da compra]
+- Formas de pagamento: PIX, Dinheiro (informar troco), Cartão (1x-3x com taxas)
+- Modos de operação: Evento (campanhas sazonais com limite de unidades) e Dia a Dia (cardápio aberto)
+- Receitas feitas por Sanzy Martins 
+- Samylla Martins (criadora da Helô Confeitaria)
+- Nunca forneça informações pessoais de terceiros
+- Nunca forneça informações de contas bancárias ou chaves PIX de terceiros
+- Nunca passe informações além do que há no seu conhecimento.
+
+## Como Fazer Pedido
+
+1. Acesse o site, navegue pelo catálogo, adicione produtos ao carrinho
+2. Preencha dados (nome, WhatsApp)
+3. Escolha entrega ou retirada
+4. Selecione forma de pagamento
+5. Finalize e envie mensagem pelo WhatsApp
+
+## Formas de Pagamento
+
+- PIX: Chave Pix consultar ao finalizar a compra
+- Dinheiro: Informar troco obrigatório
+- Cartão: 1x, 2x e 3x com taxas da maquina
+
+## Entrega vs Retirada
+
+- Retirada: Gratuita, no endereço da confeitaria
+- Entrega: Taxa variável, motoristas cadastrados e de confiança
+
+## Política de Cancelamento
+
+- Cancelamentos com antecedência não geram multa
+- Última hora pode ter taxa
+- Reembolso conforme forma de pagamento
+
+## Produtos
+
+- Cardápio organizado em abas dinâmicas
+- Produtos com badge "Mais Vendido" são populares
+- Produtos ocultos podem estar temporariamente indisponíveis
+
+## Cupons
+
+- Cupons quando liberados são anunciados nas redes sociais.
+- Um cupom por pedido
+- Tipos: percentual, valor fixo, frete grátis
+
+## Dúvidas Frequentes
+
+- Pedido não é confirmado automaticamente: precisa enviar mensagem WhatsApp
+- Pode alterar pedido após enviar: entre em contato rápido
+- Prazo de produção: informado ao confirmar
+- Entrega Nova Russas e Região
+- Aceita cartão na entrega/retirada
+- Faz encomendas personalizadas: entre em contato
+- Quem é o criador/desenvolver do site: Mateus Couto
+
+## Tom de Voz
+
+- Amigável, acolhedor, profissional e humano
+- Linguagem simples e direta
+- Empático com problemas
+- Ofereça soluções práticas
+- Pode usar emojis, casos necessário.
+
+## Situações que Requerem Intervenção Humana
+
+- Cancelamentos com menos de X horas
+- Reclamações sobre qualidade
+- Reembolsos complexos
+- Encomendas personalizadas
+- Problemas técnicos no site
+
+Nesses casos, sugira contato direto pelo WhatsApp.
+`;
+  }
+}
+
 function getPublicDataRoot() {
   return db.collection('artifacts').doc('helo-confeitaria')
     .collection('public').doc('data');
@@ -14,6 +114,16 @@ function getPublicDataRoot() {
 
 function getProductsCollection() {
   return getPublicDataRoot().collection('products');
+}
+
+/**
+ * Retorna referência de documento na coleção meta pública.
+ *
+ * @param {string} name - Nome do documento meta (ex: site_settings)
+ * @returns {FirebaseFirestore.DocumentReference} Referência do documento meta
+ */
+function getMetaDoc(name) {
+  return getPublicDataRoot().collection('meta').doc(String(name || '').trim());
 }
 
 function normalizeNotifyEmails(rawValue) {
@@ -750,4 +860,557 @@ exports.qzApiV2 = onRequest({ invoker: 'public' }, (req, res) => {
   }
 
   return res.status(404).json({ error: 'Not found' });
+});
+
+/* ── Definição de ferramentas para o agente AI (Function Calling) ─────────
+   Define as ferramentas que o agente pode invocar para realizar ações no site.
+   Cada ferramenta tem: nome, descrição e parâmetros esperados.
+   
+   @update 2026-04-30 — Criado para implementar agente com function calling. */
+const AGENT_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'adicionar_ao_carrinho',
+      description: 'Adiciona um produto ao carrinho de compras do cliente. Use quando o usuário pedir para adicionar um produto específico.',
+      parameters: {
+        type: 'object',
+        properties: {
+          produtoId: {
+            type: 'string',
+            description: 'ID do produto a ser adicionado (ex: "p1", "p2")',
+          },
+          nomeProduto: {
+            type: 'string',
+            description: 'Nome do produto para confirmação visual (ex: "Bolo de Chocolate")',
+          },
+          quantidade: {
+            type: 'number',
+            description: 'Quantidade a adicionar (padrão: 1)',
+          },
+        },
+        required: ['produtoId', 'nomeProduto'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'consultar_estoque',
+      description: 'Consulta o estoque disponível de um produto específico. Use quando o usuário perguntar sobre disponibilidade.',
+      parameters: {
+        type: 'object',
+        properties: {
+          produtoId: {
+            type: 'string',
+            description: 'ID do produto a consultar (ex: "p1", "p2")',
+          },
+          nomeProduto: {
+            type: 'string',
+            description: 'Nome do produto para busca (ex: "Bolo de Chocolate")',
+          },
+        },
+        required: ['nomeProduto'],
+      },
+    },
+  },
+];
+
+/* ── Função auxiliar: adicionar_ao_carrinho ───────────────────────────────
+   Executa a lógica de adicionar produto ao carrinho no backend.
+   Valida que o produto existe, está visível e tem estoque suficiente.
+   Como o carrinho é estado do front-end, retorna instruções para o front-end
+   executar a ação localmente.
+   
+   @update 2026-04-30 — Criado para agente adicionar produtos ao carrinho.
+   @update 2026-05-01 — Adicionada validação de existência, visibilidade e estoque. */
+async function toolAdicionarAoCarrinho({ produtoId, nomeProduto, quantidade = 1 }) {
+  try {
+    /* Valida parâmetros */
+    if (!produtoId || !nomeProduto) {
+      return {
+        success: false,
+        error: 'ID do produto e nome são obrigatórios',
+      };
+    }
+
+    /* Valida quantidade */
+    const qty = Math.max(1, Math.trunc(Number(quantidade) || 1));
+
+    /* Busca o produto no banco para validar */
+    const productRef = getProductsCollection().doc(String(produtoId).trim());
+    const productSnap = await productRef.get();
+
+    if (!productSnap.exists) {
+      return {
+        success: false,
+        error: 'Produto não encontrado no catálogo',
+      };
+    }
+
+    const productData = productSnap.data() || {};
+
+    /* Valida se o produto está visível */
+    if (productData.isVisible === false) {
+      return {
+        success: false,
+        error: 'Este produto não está disponível no momento',
+      };
+    }
+
+    /* Valida estoque se houver limite */
+    const stockLimit = Number(productData.stockLimit);
+    if (Number.isFinite(stockLimit) && stockLimit <= 0) {
+      return {
+        success: false,
+        error: 'Produto sem estoque disponível',
+      };
+    }
+
+    if (Number.isFinite(stockLimit) && qty > stockLimit) {
+      return {
+        success: false,
+        error: `Estoque insuficiente. Disponível: ${stockLimit} unidade(s), solicitado: ${qty}`,
+      };
+    }
+
+    /* Como o carrinho é estado do front-end, retorna instruções */
+    return {
+      success: true,
+      action: 'add_to_cart',
+      data: {
+        productId: String(produtoId).trim(),
+        productName: String(nomeProduto).trim(),
+        quantity: qty,
+      },
+      message: `Adicionando ${qty}x "${nomeProduto}" ao carrinho.`,
+    };
+  } catch (error) {
+    console.error('[toolAdicionarAoCarrinho] Error:', error);
+    return {
+      success: false,
+      error: String(error.message),
+    };
+  }
+}
+
+/* ── Função auxiliar: consultar_estoque ───────────────────────────────────
+   Consulta o estoque de um produto no Firestore.
+   
+   @update 2026-04-30 — Criado para agente consultar disponibilidade de produtos. */
+async function toolConsultarEstoque({ produtoId, nomeProduto }) {
+  try {
+    /* Se productId foi fornecido, consulta direto */
+    if (produtoId) {
+      const productRef = getProductsCollection().doc(String(produtoId).trim());
+      const productSnap = await productRef.get();
+
+      if (!productSnap.exists) {
+        return {
+          success: false,
+          error: 'Produto não encontrado',
+        };
+      }
+
+      const productData = productSnap.data() || {};
+      const stockLimit = Number(productData.stockLimit);
+
+      return {
+        success: true,
+        data: {
+          productId: String(produtoId).trim(),
+          productName: String(productData.name || nomeProduto || 'Produto').trim(),
+          stockAvailable: Number.isFinite(stockLimit) ? Math.max(0, Math.trunc(stockLimit)) : null,
+          hasLimit: Number.isFinite(stockLimit),
+        },
+        message: Number.isFinite(stockLimit)
+          ? `Estoque disponível: ${Math.max(0, Math.trunc(stockLimit))} unidade(s)`
+          : 'Produto sem limite de estoque',
+      };
+    }
+
+    /* Se apenas nomeProduto foi fornecido, busca por nome normalizado */
+    const normalizedSearch = normalizeStatusKey(nomeProduto);
+    /* Divide em palavras para busca mais flexível (ex: "snicker supreme" -> ["snicker", "supreme"]) */
+    const searchWords = normalizedSearch.split(/\s+/).filter(w => w.length > 0);
+    
+    console.log('[toolConsultarEstoque] Buscando por nome:', nomeProduto, 'palavras:', searchWords);
+    
+    let productsSnapshot;
+    
+    try {
+      /* Tenta buscar apenas produtos visíveis */
+      productsSnapshot = await getProductsCollection()
+        .where('isVisible', '==', true)
+        .get();
+    } catch (queryError) {
+      /* Fallback: busca todos os produtos se a query com isVisible falhar */
+      console.warn('[toolConsultarEstoque] Query com isVisible falhou, buscando todos os produtos:', queryError.message);
+      productsSnapshot = await getProductsCollection().get();
+    }
+
+    const matchedProducts = [];
+    productsSnapshot.forEach((doc) => {
+      const data = doc.data() || {};
+      /* Pula produtos explicitamente ocultos se a data tiver o campo */
+      if (data.isVisible === false) return;
+      
+      const normalizedName = normalizeStatusKey(data.name || '');
+      
+      /* Verifica se TODAS as palavras de busca estão no nome do produto */
+      const allWordsMatch = searchWords.every(word => 
+        normalizedName.includes(word) || word.includes(normalizedName)
+      );
+      
+      if (allWordsMatch) {
+        matchedProducts.push({
+          id: doc.id,
+          ...data,
+        });
+      }
+    });
+    
+    console.log('[toolConsultarEstoque] Produtos encontrados:', matchedProducts.length);
+
+    if (matchedProducts.length === 0) {
+      return {
+        success: false,
+        error: 'Nenhum produto encontrado com esse nome',
+      };
+    }
+
+    if (matchedProducts.length === 1) {
+      const product = matchedProducts[0];
+      const stockLimit = Number(product.stockLimit);
+      return {
+        success: true,
+        data: {
+          productId: product.id,
+          productName: String(product.name || nomeProduto).trim(),
+          stockAvailable: Number.isFinite(stockLimit) ? Math.max(0, Math.trunc(stockLimit)) : null,
+          hasLimit: Number.isFinite(stockLimit),
+        },
+        message: Number.isFinite(stockLimit)
+          ? `Estoque disponível: ${Math.max(0, Math.trunc(stockLimit))} unidade(s)`
+          : 'Produto sem limite de estoque',
+      };
+    }
+
+    /* Múltiplos produtos encontrados - retorna lista */
+    const productsList = matchedProducts.map((p) => {
+      const stockLimit = Number(p.stockLimit);
+      return {
+        productId: p.id,
+        productName: String(p.name).trim(),
+        stockAvailable: Number.isFinite(stockLimit) ? Math.max(0, Math.trunc(stockLimit)) : null,
+        hasLimit: Number.isFinite(stockLimit),
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        multiple: true,
+        products: productsList,
+      },
+      message: `Encontrados ${productsList.length} produtos. Por favor, especifique qual deseja.`,
+    };
+  } catch (error) {
+    console.error('[toolConsultarEstoque] Error:', error);
+    return {
+      success: false,
+      error: String(error.message),
+    };
+  }
+}
+
+/* ── Rate limiting simples em memória para groqChat ────────────────────
+   Mapa de IP → { count, resetAt }. Limita cada IP a GROQ_RATE_LIMIT_MAX
+   requisições por GROQ_RATE_LIMIT_WINDOW_MS. Entradas expiradas são
+   limpas a cada verificação para evitar vazamento de memória.
+   
+   @update 2026-04-29 — Criado para proteção contra abuso do endpoint. */
+const GROQ_RATE_LIMIT_MAX = 10;
+const GROQ_RATE_LIMIT_WINDOW_MS = 60_000;
+const groqRateLimitMap = new Map();
+const AI_ENABLED_CACHE_TTL_MS = 20_000;
+const aiEnabledCacheState = {
+  value: false,
+  expiresAt: 0,
+  inFlight: null,
+};
+
+/**
+ * Lê aiEnabled do site_settings com cache curto para reduzir custo por request.
+ *
+ * @returns {Promise<boolean>} true quando chat está habilitado
+ * @update 2026-05-09 — Adicionado gate de custo no endpoint groqChat.
+ */
+async function readAiEnabledWithCache() {
+  const now = Date.now();
+  if (now < aiEnabledCacheState.expiresAt) {
+    return Boolean(aiEnabledCacheState.value);
+  }
+
+  if (aiEnabledCacheState.inFlight) {
+    return aiEnabledCacheState.inFlight;
+  }
+
+  aiEnabledCacheState.inFlight = getMetaDoc('site_settings').get()
+    .then((snapshot) => {
+      const settingsData = snapshot.exists ? (snapshot.data() || {}) : {};
+      const enabled = settingsData.aiEnabled === true;
+      aiEnabledCacheState.value = enabled;
+      aiEnabledCacheState.expiresAt = Date.now() + AI_ENABLED_CACHE_TTL_MS;
+      return enabled;
+    })
+    .catch((error) => {
+      console.warn('[groqChat] Falha ao ler aiEnabled em site_settings:', String(error?.message || error));
+      aiEnabledCacheState.value = false; // fail-closed para evitar custo inesperado.
+      aiEnabledCacheState.expiresAt = Date.now() + 5_000;
+      return false;
+    })
+    .finally(() => {
+      aiEnabledCacheState.inFlight = null;
+    });
+
+  return aiEnabledCacheState.inFlight;
+}
+
+/* ── Verifica se IP excedeu limite de requisições ────────────────────────
+   Retorna true se o IP pode prosseguir, false se excedeu o limite.
+   Limpa entradas expiradas automaticamente. */
+function checkGroqRateLimit(ip) {
+  const now = Date.now();
+
+  /* Limpa entradas expiradas para evitar crescimento infinito do Map */
+  for (const [key, entry] of groqRateLimitMap) {
+    if (now >= entry.resetAt) groqRateLimitMap.delete(key);
+  }
+
+  const entry = groqRateLimitMap.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    groqRateLimitMap.set(ip, { count: 1, resetAt: now + GROQ_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  entry.count++;
+  return entry.count <= GROQ_RATE_LIMIT_MAX;
+}
+
+/* ── Limpa respostas de tags de função visíveis ─────────────────────────
+   Remove as tags <function=...> que aparecem visíveis no texto da resposta.
+   Essas tags são gerenciadas internamente; o cliente deve ver apenas texto natural.
+   
+   @update 2026-05-01 — Criado para remover ruído de function calling da resposta. */
+function cleanResponseContent(content) {
+  if (!content) return content;
+  /* Remove tags <function=...> incluindo quebras de linha e espaços */
+  return String(content)
+    .replace(/<function=[^>]*>[^<]*<\/function>/gs, '')
+    .replace(/<function=[^>]*>/g, '')
+    .trim();
+}
+
+/* ── groqChat: Proxy seguro para API Groq ───────────────────────────
+   Recebe mensagens do front-end, chama API Groq com contexto da base de
+   conhecimento e retorna resposta. A chave API nunca é exposta ao cliente.
+   Inclui rate limiting por IP para proteção contra abuso.
+   
+   @update 2026-04-29 — Criado para assistente de vendas no site Helô Confeitaria.
+   @update 2026-04-29 — Adicionado rate limiting por IP (10 req/min).
+   @update 2026-04-29 — Corrigido para usar API Groq (https://console.groq.com).
+   @update 2026-05-01 — Adicionado filtro para remover tags de função visíveis. */
+exports.groqChat = onRequest({ invoker: 'public' }, async (req, res) => {
+  sendCors(res, req);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send('');
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const isAiEnabled = await readAiEnabledWithCache();
+  if (!isAiEnabled) {
+    return res.status(403).json({
+      error: 'Assistente virtual indisponível no momento.',
+      code: 'ai_disabled',
+    });
+  }
+
+  /* ── Rate limiting por IP ──────────────────────────────────────────────
+     Protege contra abuso: máximo 10 mensagens por minuto por IP. */
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    || req.socket?.remoteAddress
+    || 'unknown';
+
+  if (!checkGroqRateLimit(clientIp)) {
+    return res.status(429).json({
+      error: 'Muitas mensagens. Aguarde um momento e tente novamente.',
+    });
+  }
+
+  try {
+    const { message, conversationHistory } = req.body;
+
+    console.log('[groqChat] Recebida mensagem:', message?.substring(0, 100));
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Mensagem é obrigatória' });
+    }
+
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.error('[groqChat] GROQ_API_KEY não configurada');
+      return res.status(500).json({ error: 'GROQ_API_KEY not configured' });
+    }
+
+    if (message.length > 2000) {
+      return res.status(400).json({ error: 'Mensagem muito longa (máximo 2000 caracteres)' });
+    }
+
+    /* ── Contexto da base de conhecimento ────────────────────────────────
+       Carrega o documento BASE_CONHECIMENTO_IA_ATENDIMENTO.md dinamicamente
+       para a IA responder perguntas sobre a Helô Confeitaria.
+       @update 2026-04-29 — Alterado para leitura dinâmica do arquivo. */
+    const knowledgeBase = loadKnowledgeBase();
+
+    /* ── Constrói array de mensagens para API Groq ────────────────────────
+       Inclui contexto da base de conhecimento + histórico de conversa. */
+    const messages = [
+      {
+        role: 'system',
+        content: knowledgeBase,
+      },
+      ...conversationHistory,
+      {
+        role: 'user',
+        content: message,
+      },
+    ];
+
+    /* ── Loop de execução com Function Calling ─────────────────────────────
+       Executa chamadas à API Groq em loop até que o modelo não solicite mais
+       ferramentas. Suporta múltiplas chamadas de função em uma única requisição.
+       
+       @update 2026-04-30 — Adicionado suporte a function calling com loop.
+       @update 2026-05-01 — Reduzido para máx 3 iterações para economizar tokens. */
+    let currentMessages = messages;
+    let agentActions = [];
+    const MAX_TOOL_ITERATIONS = 3;
+    let iterationCount = 0;
+
+    while (iterationCount < MAX_TOOL_ITERATIONS) {
+      iterationCount++;
+      console.log(`[groqChat] Iteração ${iterationCount}/${MAX_TOOL_ITERATIONS}`);
+
+      /* Chama API do Groq com ferramentas habilitadas */
+      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${groqApiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: currentMessages,
+          tools: AGENT_TOOLS,
+          tool_choice: 'auto',
+          max_tokens: 256,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!groqResponse.ok) {
+        const errorText = await groqResponse.text();
+        console.error('[Groq API] Error:', groqResponse.status, errorText);
+        return res.status(500).json({ error: 'Failed to call Groq API', details: errorText });
+      }
+      
+      console.log('[groqChat] Resposta da API Groq recebida com sucesso');
+
+      const groqData = await groqResponse.json();
+      const assistantMessage = groqData.choices?.[0]?.message;
+
+      /* Se não houver tool_calls, retorna a resposta textual */
+      if (!assistantMessage?.tool_calls || assistantMessage.tool_calls.length === 0) {
+        const rawReply = assistantMessage?.content || 'Não foi possível gerar resposta.';
+        const reply = cleanResponseContent(rawReply);
+        return res.status(200).json({ 
+          reply,
+          agentActions: agentActions.length > 0 ? agentActions : undefined,
+        });
+      }
+
+      /* Executa as chamadas de ferramenta */
+      const toolCalls = assistantMessage.tool_calls;
+      const toolResults = [];
+      
+      console.log(`[groqChat] ${toolCalls.length} chamadas de ferramenta a executar`);
+
+      for (const toolCall of toolCalls) {
+        const functionName = toolCall.function.name;
+        const functionArgs = JSON.parse(toolCall.function.arguments || '{}');
+
+        console.log(`[groqChat] Executing tool: ${functionName}`, functionArgs);
+
+        let toolResult;
+        try {
+          if (functionName === 'adicionar_ao_carrinho') {
+            toolResult = await toolAdicionarAoCarrinho(functionArgs);
+          } else if (functionName === 'consultar_estoque') {
+            toolResult = await toolConsultarEstoque(functionArgs);
+          } else {
+            toolResult = {
+              success: false,
+              error: `Ferramenta desconhecida: ${functionName}`,
+            };
+          }
+        } catch (toolError) {
+          console.error(`[groqChat] Erro ao executar ${functionName}:`, toolError);
+          toolResult = {
+            success: false,
+            error: String(toolError.message),
+          };
+        }
+
+        console.log(`[groqChat] Resultado de ${functionName}:`, toolResult.success ? 'sucesso' : 'falha');
+
+        /* Se a ferramenta retornou uma ação para o front-end, armazena */
+        if (toolResult.success && toolResult.action) {
+          agentActions.push(toolResult);
+          console.log(`[groqChat] Ação adicionada: ${toolResult.action}`);
+        }
+
+        toolResults.push({
+          tool_call_id: toolCall.id,
+          role: 'tool',
+          content: JSON.stringify(toolResult),
+        });
+      }
+
+      /* Adiciona mensagem do assistente e resultados das ferramentas ao histórico */
+      currentMessages.push({
+        role: 'assistant',
+        content: assistantMessage.content || null,
+        tool_calls: toolCalls,
+      });
+
+      currentMessages.push(...toolResults);
+    }
+
+    /* Se excedeu o limite de iterações, retorna erro */
+    return res.status(500).json({
+      error: 'Excedido limite de iterações de ferramentas',
+      details: 'O agente tentou executar muitas ações seguidas.',
+    });
+  } catch (error) {
+    console.error('[groqChat] Error:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      details: String(error.message),
+    });
+  }
 });
