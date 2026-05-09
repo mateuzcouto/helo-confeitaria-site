@@ -62,12 +62,11 @@ window.HeloApp = (() => {
 	   ──────────────────────────────────────────────────────────────── */
 	const auth = firebase.auth();
 	const db = firebase.firestore();
-	/* ── Força long-polling no Firestore ────────────────────────────
-	   Por padrão, o SDK tenta conexão gRPC (Listen/channel) que
-	   retorna 404 em muitos ambientes antes de cair no long-polling.
-	   Forçar long-polling elimina os 404s e funciona em todos os
-	   navegadores, proxies e redes restritas. */
-	db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false, merge: true });
+	try {
+		db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false, merge: true });
+	} catch (e) {
+		try { db.settings({ merge: true }); } catch (_) { /* fallback silencioso */ }
+	}
 
 	/* ══════════════════════════════════════════════════════════════════
 	   HELPERS DE ACESSO AO BANCO — getCol() e getMetaDoc()

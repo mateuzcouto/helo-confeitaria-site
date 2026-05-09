@@ -987,3 +987,256 @@
                 bottom: 0.8rem;
             }
         }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CHAT WIDGET — Assistente virtual flutuante
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.helo-chat-widget {
+    position: fixed;
+    bottom: 5rem;
+    right: 1rem;
+    z-index: 9999;
+    font-family: 'Nunito', sans-serif;
+}
+
+.helo-chat-toggle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #875F00, #B8860B);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(135, 95, 0, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.helo-chat-toggle:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(135, 95, 0, 0.5);
+}
+
+.helo-chat-icon {
+    font-size: 1.8rem;
+}
+
+.helo-chat-window {
+    width: 350px;
+    max-width: calc(100vw - 2rem);
+    height: 500px;
+    max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: heloChatSlideIn 0.3s ease-out;
+}
+
+@keyframes heloChatSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.helo-chat-header {
+    background: linear-gradient(135deg, #875F00, #B8860B);
+    color: #F3D494;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 1rem 1rem 0 0;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.helo-chat-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.helo-chat-avatar {
+    font-size: 1.5rem;
+}
+
+.helo-chat-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: #F3D494;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+
+.helo-chat-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.helo-chat-messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: #faf8f5;
+}
+
+.helo-chat-message {
+    display: flex;
+    max-width: 85%;
+}
+
+.helo-chat-message-user {
+    align-self: flex-end;
+}
+
+.helo-chat-message-assistant {
+    align-self: flex-start;
+}
+
+.helo-chat-bubble {
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    line-height: 1.5;
+    font-size: 0.9rem;
+    word-wrap: break-word;
+}
+
+.helo-chat-message-user .helo-chat-bubble {
+    background: linear-gradient(135deg, #875F00, #B8860B);
+    color: #F3D494;
+    border-radius: 1rem 1rem 0.25rem 1rem;
+}
+
+.helo-chat-message-assistant .helo-chat-bubble {
+    background: #ffffff;
+    color: #333;
+    border: 1px solid #e0d5c5;
+    border-radius: 1rem 1rem 1rem 0.25rem;
+}
+
+.helo-chat-bubble-loading {
+    color: #875F00;
+    font-style: italic;
+}
+
+.helo-chat-input-area {
+    padding: 0.75rem;
+    background: #ffffff;
+    border-top: 1px solid #e0d5c5;
+    display: flex;
+    gap: 0.5rem;
+    border-radius: 0 0 1rem 1rem;
+    flex-shrink: 0;
+}
+
+.helo-chat-textarea {
+    flex: 1;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #d4c4a8;
+    border-radius: 0.75rem;
+    resize: none;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    min-height: 40px;
+    max-height: 100px;
+}
+
+.helo-chat-textarea:focus {
+    border-color: #875F00;
+}
+
+.helo-chat-textarea:disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.helo-chat-send {
+    padding: 0.6rem 1rem;
+    background: linear-gradient(135deg, #875F00, #B8860B);
+    color: #F3D494;
+    border: none;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+
+.helo-chat-send:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.helo-chat-send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .helo-chat-widget {
+        bottom: 4.5rem;
+        right: 0.5rem;
+    }
+
+    .helo-chat-window {
+        width: calc(100vw - 1rem);
+        height: 90vh;
+        height: 90dvh;
+        max-height: 90vh;
+        max-height: 90dvh;
+        border-radius: 0.75rem;
+    }
+
+    .helo-chat-header {
+        border-radius: 0.75rem 0.75rem 0 0;
+    }
+
+    .helo-chat-input-area {
+        border-radius: 0 0 0.75rem 0.75rem;
+    }
+
+    .helo-chat-toggle {
+        width: 50px;
+        height: 50px;
+    }
+
+    .helo-chat-icon {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) and (max-height: 400px) {
+    .helo-chat-window {
+        height: 95vh;
+        height: 95dvh;
+        max-height: 95vh;
+        max-height: 95dvh;
+    }
+}
