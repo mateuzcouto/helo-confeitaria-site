@@ -1605,6 +1605,8 @@ const App = () => {
                 />
             </div>
 
+            {window.HeloChatWidget && siteSettings.aiEnabled !== false && <window.HeloChatWidget />}
+
             <ModalAcessoReservado
                 open={showLoginModal}
                 loginEmail={loginEmail}
