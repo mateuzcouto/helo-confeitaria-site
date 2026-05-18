@@ -27,9 +27,25 @@ cd site-helo-final/site-helo-final
 firebase deploy --only hosting
 ```
 
-O Firebase executa automaticamente **predeploy** (`npm run prepare:hosting`): transpila JSX → `public/js-build/`, atualiza `?v=` nos HTML para cache-bust, e scripts auxiliares. Projeto padrão: `helo-confeitaria`; site: **heloconfeitarianr**.
+O Firebase executa automaticamente **predeploy** (`npm run prepare:hosting`), nesta ordem:
 
-Para apenas gerar bundles localmente sem deploy: `npm run build:public` ou `npm run prepare:hosting`.
+1. `npm run build:public` — transpila JSX de `public/js/` → `public/js-build/` (esbuild).
+2. `node scripts/test-client-ranking.js` — testes do motor `HeloClientRanking` (ranking Top Clientes).
+3. `node scripts/validate-html-pages.js` — garante que `index.html`, `admin.html` e `confirmacao.html` só referenciam scripts existentes e respeitam o contrato dual-HTML.
+4. `node scripts/stamp-version.js` — gera `public/deploy-version.json` e alinha `?v=` nos HTML + `VERSAO_ASSETS_ESTATICOS`.
+5. `node scripts/strip-bom.js public` — remove BOM de arquivos de texto.
+
+Projeto padrão: `helo-confeitaria`; site: **heloconfeitarianr** — produção: <https://heloconfeitarianr.web.app/>.
+
+Comandos úteis:
+
+| Comando | Uso |
+| --- | --- |
+| `npm run build:public` | Só transpilar (desenvolvimento rápido) |
+| `npm run validate:html` | Validar referências de scripts nos HTML |
+| `npm run test:ranking` | Rodar só os testes de ranking |
+| `npm run prepare:hosting` | Pipeline completo pré-deploy |
+| `npm run deploy:hosting` | Deploy Hosting (roda `prepare:hosting` no predeploy do Firebase) |
 
 **Dica de manutenção:** em arquivos `.js`, comentários de bloco `/* … */` não podem conter a sequência `*/` no meio do texto (ex.: ao documentar uma regex como `…]*/g…`). Isso encerra o comentário cedo e pode quebrar o script — já ocorreu em `scripts/stamp-version.js` (corrigido).
 
@@ -46,8 +62,9 @@ Clientes navegam pelo catálogo, montam pedidos no carrinho e finalizam via What
 
 ### Atualizações recentes (changelog resumido)
 
-Detalhes no histórico do [`PDR.md`](PDR.md) (§10, §10.1 e §10.2).
+Detalhes no histórico do [`PDR.md`](PDR.md) (§10 e subseções §10.1–§10.5).
 
+- **Ranking Top Clientes (admin):** aba **Clientes → Top Clientes** com períodos **Hoje / Semana / Mês / 7 dias / 30 dias** (fuso `America/Fortaleza`), toggle **Valor (R$)** ou **Qtd. pedidos**, card do melhor cliente e tabela (top 50). Só entram pedidos **Pago**, **Pronto** ou **Concluído**; uma query Firestore por visita à aba alimenta todos os recortes em memória. Motor: [`public/js/core/analytics/client-ranking.js`](public/js/core/analytics/client-ranking.js) (`window.HeloClientRanking`); hook `useRankingClientesPeriodo` em `public/js/script.js`. Deploy hosting **20260518-225751** (ver `public/deploy-version.json`).
 - **Contatos públicos (fonte única):** WhatsApp, Instagram, TikTok, mapa e telefone visível vivem em [`public/js/core/constants/contatos-loja-publica.js`](public/js/core/constants/contatos-loja-publica.js) (`window.HeloPublicContact` + `montarHrefWhatsAppLojaPublica`). Rodapé, ecrã "loja fechada" e mensagens de pedido leem daqui.
 - **Marketing / UTF-8:** `HeloCoreUtils.corrigirMoibakeComumMarketing` + `sanitizarMarketingSiteSettingsRecebidas` em [`public/js/core/utils/text-date-utils.js`](public/js/core/utils/text-date-utils.js) corrigem apenas padrões latin1/UTF-8 conhecidos no `announcementText` ao receber `site_settings`; textos no Firestore devem ser guardados em UTF-8.
 - **Firestore `site_settings` com cache offline:** `onSnapshot({ includeMetadataChanges: true })` + `get({ source: 'server' })` ao `online` / `pageshow` / voltar de background em [`public/js/main-app.js`](public/js/main-app.js) e [`public/js/app-admin.js`](public/js/app-admin.js).
@@ -140,7 +157,9 @@ Após editar esses arquivos, rode `npm run build:public` para atualizar `public/
 ### Painel Administrativo (Admin)
 
 - **Pedidos** — Lista em tempo real com status (Novo → Confirmado → Pago → Pronto → Concluído), filtros por categoria, busca ampliada (cliente, status, pagamento, campanha, itens, categorias), badges de categoria por item, edição inline, detecção de duplicatas
-- **Clientes** (navbar **Clientes**) — **Top Clientes**, **Top Pedidos**, **Inativos**, **Acessos**. A aba **Inativos** mostra só clientes com **último pedido há mais de 30 dias corridos** (~1 mês), ordenados por inatividade, com destaque por faixa (ex.: 30–59 dias), data da última compra e atalho **Chamar no WhatsApp**; quando há registros, é possível **baixar um relatório HTML** do quadro. Lógica: hook `useClientesInativos` + componente `ClientesInativosAlerta` em `public/js/script.js` (tab `inativos`).
+- **Clientes** (navbar **Clientes**) — **Top Clientes**, **Top Pedidos**, **Inativos**, **Acessos**.
+  - **Top Clientes:** ranking por período (**Hoje**, **Semana**, **Mês**, **7 dias**, **30 dias**) no fuso **America/Fortaleza**; alternância **Valor (R$)** × **Qtd. pedidos**; card do melhor cliente do recorte; filtro de campanha e botão **Criar Story** (top 3). Entram só pedidos com status **Pago**, **Pronto** ou **Concluído**, agrupados por telefone (últimos 8 dígitos). Uma consulta Firestore (`createdAt >=` início do mês civil ou rolling 30d, o que for mais antigo, até 3000 pedidos) alimenta todos os recortes em memória — motor `public/js/core/analytics/client-ranking.js` (`window.HeloClientRanking`) + hook `useRankingClientesPeriodo` em `public/js/script.js` (tab `customers`). Testes: `node scripts/test-client-ranking.js`.
+  - **Inativos:** só clientes com **último pedido há mais de 30 dias corridos** (~1 mês), ordenados por inatividade, com destaque por faixa (ex.: 30–59 dias), data da última compra e atalho **Chamar no WhatsApp**; quando há registros, é possível **baixar um relatório HTML** do quadro. Lógica: `useClientesInativos` + `ClientesInativosAlerta` (tab `inativos`).
 - **Agenda** — Agendamentos com categorias, status e busca normalizada
 - **Entregas** — Filtros por motorista, campanha e período; KPIs de rentabilidade; tabela diária consolidada
 - **Cardápio** — CRUD de produtos com upload de imagens, categorias, abas de menu, score de completude e deduplicação por identidade
@@ -177,7 +196,7 @@ Referências de implementação:
 - **Admin Claim API** — Endpoint seguro para atribuir custom claim `admin` a e-mails autorizados
 - **QZ Tray API** — Endpoints de assinatura digital e certificado para impressão térmica segura (chaves privadas no servidor, nunca expostas ao front-end)
 - **Assistente de IA (groqChat)** — Proxy seguro para API Groq com base de conhecimento dinâmica, rate limiting (10 req/min por IP), CORS configurado e gate de custo por `site_settings.aiEnabled`.
-- **WhatsApp via n8n (opcional)** — Triggers Firestore + `POST` JSON com Bearer para webhook único (`event` no corpo); idempotência em `orders.integrations.n8n`. Ver `functions/README.md`, `functions/n8nWhatsAppIntegration.js` e §10.3 no `PDR.md`.
+- **WhatsApp via n8n (opcional)** — Triggers Firestore + `POST` JSON com Bearer para webhook único (`event` no corpo); idempotência em `orders.integrations.n8n`. Ver `functions/README.md`, `functions/n8nWhatsAppIntegration.js` e §10.4 no `PDR.md`.
 
 ### Horário oficial do Dia a Dia
 
@@ -306,6 +325,8 @@ site-helo-final/
 │   │       ├── utils/
 │   │       │   ├── admin-utils.js  # window.HeloAdminUtils (normalização, busca, IDs)
 │   │       │   └── text-date-utils.js  # window.HeloCoreUtils (texto, datas, sanitização marketing)
+│   │       ├── analytics/
+│   │       │   └── client-ranking.js   # window.HeloClientRanking (ranking Top Clientes, sem Firestore)
 │   │       ├── campaign/
 │   │       │   └── campaign-utils.js   # window.HeloCampaignUtils (campanhas)
 │   │       └── catalog.js          # window.HeloCatalog (categorias, abas, deduplicação)
@@ -321,6 +342,8 @@ site-helo-final/
 │   └── package.json
 ├── scripts/                         # Scripts de build e utilidade
 │   ├── build-public-js.js           # Transpila JSX de js/ → js-build/ via esbuild
+│   ├── test-client-ranking.js       # Testes unitários de HeloClientRanking (Node, sem Jest)
+│   ├── validate-html-pages.js       # Valida scripts em index/admin/confirmacao (dual-HTML)
 │   ├── stamp-version.js             # Versão UTC: ?v= nos HTML, deploy-version.json, admin-utils
 │   ├── strip-bom.js                 # Remove BOM de arquivos de texto
 │   └── migrate-campaigns.js         # Migração de campanhas (backfill campaignId)
@@ -473,6 +496,7 @@ O projeto usa IIFEs (Immediately Invoked Function Express) que expõem APIs em o
 | Carrinho (hooks)        | `window.HeloCart`          | `carrinho.js`                     |
 | CRM                     | `window.HeloCrm`           | `crm.js`                          |
 | Financeiro              | `window.HeloFinance`       | `financeiro.js`                   |
+| Ranking de clientes     | `window.HeloClientRanking` | `core/analytics/client-ranking.js` |
 | Estoque                 | `window.HeloInventory`     | `estoque.js`                      |
 | Estados globais         | `window.*` (escopo global) | `core-globals.js`                 |
 | Componentes visuais     | `window.HeloComponents`    | `components/*.component.js`       |
@@ -505,7 +529,9 @@ core/config/app-config.js
 → components (brand-logo, cabecalho, rodape-site, store-closed-vitrina,
    admin/admin-toggle-pill, admin/admin-settings-card)
 → app.js → carrinho.js → crm.js → financeiro.js → estoque.js
-→ core/utils/admin-utils.js → core/catalog.js → core-globals.js
+→ core/utils/admin-utils.js
+→ core/analytics/client-ranking.js   # HeloClientRanking — antes de script.js (lazy)
+→ core/catalog.js → core-globals.js
 → app-admin.js (React root; `script.js` carrega depois sob demanda)
 ```
 

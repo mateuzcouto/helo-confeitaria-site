@@ -13,7 +13,7 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>Helô Confeitaria | Pedidos e Gestão Avançada</title>
-    <meta name="deploy-version" content="20260509-053850" />
+    <meta name="deploy-version" content="20260518-225751" />
     <meta
       name="description"
       content="Helô Confeitaria: Sistema profissional de pedidos e gestão. Confeitaria e doces artesanais com delivery. Peça pelo WhatsApp, Facebook ou acesse nosso portal de vendas."
@@ -67,14 +67,14 @@
     <link
       rel="icon"
       type="image/svg+xml"
-      href="./favicon.svg?v=20260509-053850"
+      href="./favicon.svg?v=20260518-225751"
     />
     <link
       rel="alternate icon"
       type="image/x-icon"
-      href="./favicon.ico?v=20260509-053850"
+      href="./favicon.ico?v=20260518-225751"
     />
-    <link rel="shortcut icon" href="./favicon.ico?v=20260509-053850" />
+    <link rel="shortcut icon" href="./favicon.ico?v=20260518-225751" />
 
     <script defer src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -84,14 +84,14 @@
     <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
-    <!-- QZ Tray — impressão térmica local via impressora conectada por cabo -->
-    <script defer src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.5/qz-tray.js"></script>
+    <!-- QZ Tray: carregado sob demanda em script.js (primeira impressão/diagnóstico) para poupar RAM na abertura -->
 
     <link
       rel="stylesheet"
       id="app-style"
-      href="./css/style.css?v=20260509-053850"
+      href="./css/style.css?v=20260518-225751"
     />
+    <link rel="stylesheet" href="./css/admin-settings.css?v=20260518-225751" />
   </head>
 
   <body>
@@ -99,33 +99,39 @@
     <!-- ═══════════════════════════════════════════════════════════════════════
          SCRIPTS DO PAINEL ADMINISTRATIVO
          Ordem de dependência (não alterar): app-config → text-date-utils →
-         campaign-utils → componentes → app.js → carrinho → crm → financeiro →
-         estoque → admin-utils → catalog → core-globals → script.js → app-admin.js
+         contatos-loja-publica → campaign-utils → componentes (rodapé, store-closed-vitrina, admin/ui) →
+         app.js → carrinho → crm → financeiro → estoque → admin-utils →
+         catalog → core-globals → script.js (sob demanda) → app-admin.js
          app-admin é gerado com IIFE próprio (build-public-js). Após deploy,
-         atualizar ?v=20260509-053850 neste HTML para invalidar cache.
+         atualizar ?v=20260518-225751 neste HTML para invalidar cache (stamp-version).
 
          IMPORTANTE: Todos os scripts devem estar em ./js-build/ (transpilados)
          Live Server e Firebase Hosting não conseguem executar JSX direto.
          ═══════════════════════════════════════════════════════════════════════ -->
-    <script defer src="./js-build/core/config/app-config.js?v=20260509-053850"></script>
-    <script defer src="./js-build/core/utils/text-date-utils.js?v=20260509-053850"></script>
-    <script defer src="./js-build/core/campaign/campaign-utils.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core/config/app-config.js?v=20260518-225751"></script>
+    <script defer src="./js-build/core/utils/text-date-utils.js?v=20260518-225751"></script>
+    <script defer src="./js-build/core/constants/contatos-loja-publica.js?v=20260518-225751"></script>
+    <script defer src="./js-build/core/campaign/campaign-utils.js?v=20260518-225751"></script>
     <!-- Componentes de marca compartilhados (logo, cabeçalho, rodapé) -->
-    <script defer src="./js-build/components/brand-logo.component.js?v=20260509-053850"></script>
-    <script defer src="./js-build/components/cabecalho.component.js?v=20260509-053850"></script>
-    <script defer src="./js-build/components/rodape-site.component.js?v=20260509-053850"></script>
+    <script defer src="./js-build/components/brand-logo.component.js?v=20260518-225751"></script>
+    <script defer src="./js-build/components/cabecalho.component.js?v=20260518-225751"></script>
+    <script defer src="./js-build/components/rodape-site.component.js?v=20260518-225751"></script>
+    <script defer src="./js-build/components/store-closed-vitrina.component.js?v=20260518-225751"></script>
+    <script defer src="./js-build/components/admin/admin-toggle-pill.component.js?v=20260518-225751"></script>
+    <script defer src="./js-build/components/admin/admin-settings-card.component.js?v=20260518-225751"></script>
     <!-- Módulos de negócio exclusivos do admin -->
-    <script defer src="./js-build/app.js?v=20260509-053850"></script>
-    <script defer src="./js-build/carrinho.js?v=20260509-053850"></script>
-    <script defer src="./js-build/crm.js?v=20260509-053850"></script>
-    <script defer src="./js-build/financeiro.js?v=20260509-053850"></script>
-    <script defer src="./js-build/estoque.js?v=20260509-053850"></script>
+    <script defer src="./js-build/app.js?v=20260518-225751"></script>
+    <script defer src="./js-build/carrinho.js?v=20260518-225751"></script>
+    <script defer src="./js-build/crm.js?v=20260518-225751"></script>
+    <script defer src="./js-build/financeiro.js?v=20260518-225751"></script>
+    <script defer src="./js-build/estoque.js?v=20260518-225751"></script>
     <!-- Utilitários compartilhados entre vitrine e admin -->
-    <script defer src="./js-build/core/utils/admin-utils.js?v=20260509-053850"></script>
-    <script defer src="./js-build/core/catalog.js?v=20260509-053850"></script>
-    <script defer src="./js-build/core-globals.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core/utils/admin-utils.js?v=20260518-225751"></script>
+    <script defer src="./js-build/core/analytics/client-ranking.js?v=20260518-225751"></script>
+    <script defer src="./js-build/core/catalog.js?v=20260518-225751"></script>
+    <script defer src="./js-build/core-globals.js?v=20260518-225751"></script>
     <!-- Entrypoint do admin (app-admin carrega script.js sob demanda após login/feedback) -->
-    <script defer src="./js-build/app-admin.js?v=20260509-053850"></script>
+    <script defer src="./js-build/app-admin.js?v=20260518-225751"></script>
     <!-- ═══════════════════════════════════════════════════════════════════════
          NOTA DE ARQUITETURA (Fase 1 — Otimização de Performance):
          Os seguintes módulos da VITRINE foram REMOVIDOS do admin.html

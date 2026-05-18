@@ -15,6 +15,7 @@
    7. AdminPanel — Componente principal do painel admin com todas as abas:
       Pedidos, Agenda, Entregas, Cardápio, Produção & Estoque,
       Financeiro, Feedbacks, Campanhas, Configurações
+   @update 2026-05-09 — QZ Tray lazy-load; virtualização da lista em Fluxo de Pedidos.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* As desestruturações de React, HeloApp, HeloCart, HeloCrm, HeloFinance,
@@ -740,7 +741,57 @@ const readResponseAsTextOrJson = async (response) => {
     }
 };
 
+/** Promise singleton para não injetar o script QZ Tray mais de uma vez. */
+let heloQzTrayLoadPromise = null;
+
+/**
+ * Injeta o SDK QZ Tray apenas quando necessário (impressão térmica / diagnóstico), reduzindo RAM na carga inicial do admin.
+ *
+ * @returns {Promise<boolean>} Resolve true se `window.qz` existir após o carregamento.
+ */
+const loadQzTrayScript = () => {
+    if (typeof window === 'undefined') return Promise.reject(new Error('Ambiente sem window.'));
+    if (window.qz) return Promise.resolve(true);
+    if (heloQzTrayLoadPromise) return heloQzTrayLoadPromise;
+
+    heloQzTrayLoadPromise = new Promise((resolve, reject) => {
+        const existing = typeof document !== 'undefined'
+            ? document.querySelector('script[data-helo-qz-tray="1"]')
+            : null;
+        const finalizeOk = () => {
+            if (window.qz) resolve(true);
+            else reject(new Error('Script QZ Tray carregou mas window.qz não foi definido.'));
+        };
+        if (existing) {
+            if (window.qz) {
+                finalizeOk();
+                return;
+            }
+            existing.addEventListener('load', finalizeOk, { once: true });
+            existing.addEventListener('error', () => reject(new Error('Falha ao carregar script QZ Tray.')), { once: true });
+            return;
+        }
+
+        const scriptEl = document.createElement('script');
+        scriptEl.src = 'https://cdn.jsdelivr.net/npm/qz-tray@2.2.5/qz-tray.js';
+        scriptEl.async = true;
+        scriptEl.dataset.heloQzTray = '1';
+        scriptEl.onload = () => finalizeOk();
+        scriptEl.onerror = () => reject(new Error('Não foi possível baixar qz-tray.js (rede ou CDN).'));
+        document.head.appendChild(scriptEl);
+    });
+
+    return heloQzTrayLoadPromise;
+};
+
 const ensureQzSecurityHooks = async () => {
+    if (typeof window !== 'undefined' && !window.qz) {
+        try {
+            await loadQzTrayScript();
+        } catch (loadErr) {
+            console.warn('[QZ Tray]', safeText(loadErr?.message || loadErr));
+        }
+    }
     if (qzSecurityState.configured) return;
     if (!QZ_SECURITY_ENABLED) return;
     if (qzSecurityState.unavailableReason) return;
@@ -853,6 +904,495 @@ const describeThermalPrintError = (error) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
+   useClientesInativos() — HOOK DE CLIENTES INATIVOS
+   ═══════════════════════════════════════════════════════════════════════
+   Calcula quais clientes não realizaram nenhum pedido (não cancelado)
+   há mais de `diasLimite` dias, a partir de `allOrders`.
+
+   Como funciona:
+   1. Percorre todos os pedidos, ignorando os com status "cancelado"
+   2. Agrupa por customerPhone (últimos 8 dígitos, padrão do projeto)
+   3. Registra a data do pedido mais recente por cliente
+   4. Calcula a diferença em dias entre hoje e esse último pedido
+   5. Retorna apenas os clientes com diferença > diasLimite, ordenados
+      do mais inativo (mais dias) para o menos inativo
+
+   Parâmetros:
+   - allOrders   → Lista de todos os pedidos (vem de app-admin.js)
+   - diasLimite  → Quantidade de dias de inatividade (padrão: 30)
+
+   Retorna: [{ phone, name, diasInativos, ultimaCompraStr }]
+   ═══════════════════════════════════════════════════════════════════════ */
+function useClientesInativos(allOrders, diasLimite) {
+    /* Garante valor padrão seguro caso diasLimite não seja passado */
+    const limite = typeof diasLimite === 'number' ? diasLimite : 30;
+
+    return useMemo(() => {
+        /* Mapa: chave = últimos 8 dígitos do telefone, valor = dados do cliente */
+        const mapa = {};
+        const hoje = Date.now();
+
+        (Array.isArray(allOrders) ? allOrders : []).forEach(order => {
+            /* ── Normaliza e ignora pedidos cancelados ──────────────────
+               Remove acentos do status para comparar sem diacríticos,
+               mesmo padrão usado em outros pontos do script.js. */
+            const statusNorm = safeText(order.status)
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+            if (statusNorm === 'cancelado') return;
+
+            /* ── Normaliza o telefone (últimos 8 dígitos) ───────────────
+               Padrão idêntico ao do hook useSpecialClient anterior. */
+            const phoneFull = String(order.customerPhone || '').replace(/\D/g, '');
+            if (phoneFull.length < 8) return;
+            const phoneKey = phoneFull.slice(-8);
+
+            /* ── Converte createdAt (Firestore Timestamp ou objeto .seconds) */
+            let createdMs = 0;
+            if (typeof order.createdAt?.toDate === 'function') {
+                createdMs = order.createdAt.toDate().getTime();
+            } else if (order.createdAt?.seconds) {
+                createdMs = order.createdAt.seconds * 1000;
+            }
+            if (!createdMs) return;
+
+            /* ── Atualiza o registro do cliente ─────────────────────────
+               Se o pedido atual é mais recente, substitui lastOrderMs. */
+            if (!mapa[phoneKey]) {
+                mapa[phoneKey] = {
+                    phone: phoneFull,
+                    name: safeText(order.customerName) || 'Cliente',
+                    lastOrderMs: createdMs,
+                };
+            } else {
+                if (createdMs > mapa[phoneKey].lastOrderMs) {
+                    mapa[phoneKey].lastOrderMs = createdMs;
+                }
+                /* Consolida o nome: usa o mais recente se ainda for genérico */
+                if (mapa[phoneKey].name === 'Cliente' && order.customerName) {
+                    mapa[phoneKey].name = safeText(order.customerName);
+                }
+            }
+        });
+
+        return Object.values(mapa)
+            .map(c => {
+                const diasInativos = Math.floor((hoje - c.lastOrderMs) / 86400000);
+                /* Formata data da última compra para exibição: "DD/MM/AAAA" */
+                const d = new Date(c.lastOrderMs);
+                const ultimaCompraStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                return { phone: c.phone, name: c.name, diasInativos, ultimaCompraStr };
+            })
+            .filter(c => c.diasInativos > limite)
+            .sort((a, b) => b.diasInativos - a.diasInativos);
+    }, [allOrders, limite]);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   useRankingClientesPeriodo() — RANKING DE CLIENTES POR PERÍODO
+   ═══════════════════════════════════════════════════════════════════════
+   Busca pedidos recentes no Firestore (janela mês civil + rolling 30 em Fortaleza)
+   e agrega rankings em memória para hoje, semana, mês, 7d e 30d.
+
+   Parâmetros:
+   - tab — aba ativa do admin (só consulta quando tab === 'customers')
+   - db — instância Firestore
+   - insightsCampaignFilter — 'all' ou id de campanha
+   - normalizeCampaignId / CAMPAIGN_LEGACY_ID — filtro pós-fetch
+
+   Retorna: { loading, erro, atingiuLimite, pedidosCarregados, rankingPorPeriodo, recarregar }
+   ═══════════════════════════════════════════════════════════════════════ */
+function useRankingClientesPeriodo({
+    tab,
+    db,
+    insightsCampaignFilter,
+    normalizeCampaignId,
+    CAMPAIGN_LEGACY_ID,
+}) {
+    const [loading, setLoading] = useState(false);
+    const [erro, setErro] = useState('');
+    const [atingiuLimite, setAtingiuLimite] = useState(false);
+    const [pedidosCarregados, setPedidosCarregados] = useState(0);
+    const [rankingPorPeriodo, setRankingPorPeriodo] = useState({});
+    const [recarregarToken, setRecarregarToken] = useState(0);
+
+    const recarregar = useCallback(() => {
+        setRecarregarToken((prev) => prev + 1);
+    }, []);
+
+    useEffect(() => {
+        if (tab !== 'customers' || !db || typeof getCol !== 'function') {
+            return undefined;
+        }
+
+        const motor = window.HeloClientRanking;
+        if (!motor || typeof motor.calcularInicioJanelaConsulta !== 'function') {
+            setErro('Módulo de ranking não carregado. Recarregue o painel.');
+            return undefined;
+        }
+
+        let cancelado = false;
+
+        const carregarRanking = async () => {
+            setLoading(true);
+            setErro('');
+            try {
+                const agoraMs = Date.now();
+                const inicioJanelaMs = motor.calcularInicioJanelaConsulta(agoraMs);
+                const inicioTs = firebase.firestore.Timestamp.fromMillis(inicioJanelaMs);
+
+                const snap = await getCol('orders')
+                    .where('createdAt', '>=', inicioTs)
+                    .orderBy('createdAt', 'desc')
+                    .limit(motor.LIMITE_PEDIDOS_RANKING)
+                    .get();
+
+                if (cancelado) return;
+
+                const pedidosBrutos = snap.docs.map((docSnap) => ({
+                    id: docSnap.id,
+                    ...docSnap.data(),
+                    campaignId: normalizeCampaignId(docSnap.data()?.campaignId, CAMPAIGN_LEGACY_ID),
+                }));
+
+                const pedidosCampanha = insightsCampaignFilter === 'all'
+                    ? pedidosBrutos
+                    : pedidosBrutos.filter(
+                        (pedido) => normalizeCampaignId(pedido.campaignId, CAMPAIGN_LEGACY_ID) === insightsCampaignFilter
+                    );
+
+                const rankings = motor.construirRankingsPorPeriodo(pedidosCampanha, agoraMs, safeText);
+
+                setRankingPorPeriodo(rankings);
+                setPedidosCarregados(pedidosCampanha.length);
+                setAtingiuLimite(snap.size >= motor.LIMITE_PEDIDOS_RANKING);
+            } catch (err) {
+                if (cancelado) return;
+                console.warn('[RankingClientes] Falha ao carregar pedidos:', err?.message || err);
+                setErro('Não foi possível carregar o ranking. Verifique a conexão e tente novamente.');
+                setRankingPorPeriodo({});
+                setPedidosCarregados(0);
+                setAtingiuLimite(false);
+            } finally {
+                if (!cancelado) setLoading(false);
+            }
+        };
+
+        carregarRanking();
+
+        return () => {
+            cancelado = true;
+        };
+    }, [
+        tab,
+        db,
+        insightsCampaignFilter,
+        normalizeCampaignId,
+        CAMPAIGN_LEGACY_ID,
+        recarregarToken,
+    ]);
+
+    return {
+        loading,
+        erro,
+        atingiuLimite,
+        pedidosCarregados,
+        rankingPorPeriodo,
+        recarregar,
+    };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   gerarDocumentoInativos() — GERA DOCUMENTO HTML E DISPARA DOWNLOAD
+   ═══════════════════════════════════════════════════════════════════════
+   Constrói um arquivo HTML leve com o relatório de clientes inativos
+   e aciona o download diretamente no navegador (sem servidor).
+
+   Parâmetros:
+   - clientesInativos → array de { name, phone, diasInativos, ultimaCompraStr }
+
+   Retorna: void (aciona download como efeito colateral)
+   ═══════════════════════════════════════════════════════════════════════ */
+function gerarDocumentoInativos(clientesInativos) {
+    /* Data/hora de geração formatada para o cabeçalho do documento */
+    const agora = new Date();
+    const dataGeracao = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const horaGeracao = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    /* Monta as linhas da tabela — cada cliente vira uma <tr> */
+    const linhasTabela = clientesInativos.map((c, i) => {
+        const corLinha = c.diasInativos >= 60 ? '#fff1f2' : '#fff7ed';
+        const corBadge = c.diasInativos >= 60 ? '#ef4444' : '#fb923c';
+        const numFmt = String(c.phone || '').replace(/\D/g, '');
+        const telFmt = numFmt.length === 11
+            ? `(${numFmt.slice(0,2)}) ${numFmt.slice(2,7)}-${numFmt.slice(7)}`
+            : numFmt;
+        return `
+        <tr style="background:${corLinha}">
+          <td style="padding:10px 14px;font-weight:600;color:#1e293b">${i + 1}</td>
+          <td style="padding:10px 14px;font-weight:700;color:#1e293b">${String(c.name || 'Cliente')}</td>
+          <td style="padding:10px 14px;color:#475569">${telFmt}</td>
+          <td style="padding:10px 14px;color:#475569">${c.ultimaCompraStr || '—'}</td>
+          <td style="padding:10px 14px;text-align:center">
+            <span style="background:${corBadge};color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">
+              ${c.diasInativos} dias
+            </span>
+          </td>
+        </tr>`;
+    }).join('');
+
+    /* Template HTML do documento — leve, sem dependências externas */
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Relatório de Clientes Inativos — Helô Confeitaria</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#1e293b;padding:32px 24px}
+    .cabecalho{background:#9a3412;color:#fff;border-radius:12px;padding:24px 28px;margin-bottom:28px}
+    .cabecalho h1{font-size:20px;font-weight:900;margin-bottom:4px}
+    .cabecalho p{font-size:13px;opacity:.85}
+    .resumo{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+    .card-resumo{flex:1;min-width:140px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:center}
+    .card-resumo .num{font-size:28px;font-weight:900;color:#9a3412}
+    .card-resumo .leg{font-size:11px;color:#64748b;margin-top:2px}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    thead tr{background:#9a3412;color:#fff}
+    th{padding:12px 14px;font-size:12px;font-weight:700;text-align:left}
+    td{border-bottom:1px solid #f1f5f9;font-size:13px}
+    tr:last-child td{border-bottom:none}
+    .rodape{margin-top:28px;font-size:11px;color:#94a3b8;text-align:center}
+    @media print{body{padding:0}button{display:none}}
+  </style>
+</head>
+<body>
+  <div class="cabecalho">
+    <h1>Relatório de Clientes Inativos</h1>
+    <p>Helô Confeitaria &nbsp;·&nbsp; Gerado em ${dataGeracao} às ${horaGeracao}</p>
+  </div>
+  <div class="resumo">
+    <div class="card-resumo"><div class="num">${clientesInativos.length}</div><div class="leg">Total de inativos</div></div>
+    <div class="card-resumo"><div class="num">${clientesInativos.filter(c => c.diasInativos >= 60).length}</div><div class="leg">Críticos (60+ dias)</div></div>
+    <div class="card-resumo"><div class="num">${clientesInativos.filter(c => c.diasInativos < 60).length}</div><div class="leg">Atenção (30–59 dias)</div></div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Nome</th><th>Telefone</th><th>Última Compra</th><th>Inativo há</th></tr></thead>
+    <tbody>${linhasTabela}</tbody>
+  </table>
+  <div class="rodape">Helô Confeitaria — uso interno · ${dataGeracao}</div>
+</body>
+</html>`;
+
+    /* Cria Blob, gera URL temporária e aciona download sem abrir nova aba */
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href     = url;
+    link.download = `clientes-inativos-${agora.getFullYear()}${String(agora.getMonth()+1).padStart(2,'0')}${String(agora.getDate()).padStart(2,'0')}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    /* Libera a URL temporária da memória após 60 s */
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ClientesInativosAlerta — COMPONENTE DE ALERTA DE CLIENTES INATIVOS
+   ═══════════════════════════════════════════════════════════════════════
+   Exibido na aba "Inativos" do grupo "Clientes" do painel administrativo.
+   Calcula automaticamente quais clientes estão sem comprar há mais de
+   30 dias e os apresenta em cards com:
+   - Nome, telefone e dias de inatividade
+   - Botão de link direto para o WhatsApp Web (mensagem pré-preenchida)
+   - Botão "Baixar Documento" que gera um arquivo HTML para download local
+
+   Props:
+   - allOrders → Lista completa de pedidos (vem de AdminPanel)
+   ═══════════════════════════════════════════════════════════════════════ */
+const ClientesInativosAlerta = React.memo(({ allOrders }) => {
+
+    /* ── Calcula clientes inativos (>30 dias) ──────────────────────────── */
+    const clientesInativos = useClientesInativos(allOrders, 30);
+
+    /* ── Cores de urgência por dias de inatividade ──────────────────────
+       Laranja (30–59 dias): atenção — reativação possível com contato
+       Vermelho (60+ dias):  crítico — risco alto de perder o cliente */
+    const corUrgencia = (dias) => {
+        if (dias >= 60) return { bg: '#fef2f2', borda: '#fca5a5', badge: '#ef4444', texto: '#991b1b' };
+        return { bg: '#fff7ed', borda: '#fdba74', badge: '#fb923c', texto: '#92400e' };
+    };
+
+    /* ── Monta link WhatsApp com mensagem pré-preenchida ────────────────
+       Usa wa.me/55{phone}?text=... (padrão sem API, abre WhatsApp Web)
+       Parâmetro `phone` já é o número completo (digits only). */
+    const montarLinkWhatsApp = (phone, name) => {
+        const numero = String(phone || '').replace(/\D/g, '');
+        const numComPais = numero.startsWith('55') ? numero : `55${numero}`;
+        const nomeFormatado = String(name || 'cliente').split(' ')[0];
+        const mensagem = `Olá, ${nomeFormatado}! Aqui é a Helô Confeitaria. Sentimos sua falta! 🍫 Que tal fazer um novo pedido especial hoje?`;
+        return `https://wa.me/${numComPais}?text=${encodeURIComponent(mensagem)}`;
+    };
+
+    /* ── Formata o número de telefone para exibição ─────────────────────
+       Ex: "88981577625" → "(88) 98157-7625" */
+    const formatarTelefone = (phone) => {
+        const d = String(phone || '').replace(/\D/g, '');
+        if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+        if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+        return d;
+    };
+
+    /* ── Aciona geração e download do documento HTML ───────────────────
+       Chama gerarDocumentoInativos() — síncrono, sem servidor. */
+    const handleBaixarDocumento = () => gerarDocumentoInativos(clientesInativos);
+
+    /* ── Renderização ─────────────────────────────────────────────────── */
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+            {/* ── CABEÇALHO DE ALERTA ── */}
+            <div style={{ background: '#fff7ed', border: '2px solid #fb923c', borderRadius: '1.5rem', padding: '1.5rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                    <i className="ph-bold ph-warning-circle" style={{ fontSize: '32px', color: '#fb923c', flexShrink: 0 }}></i>
+                    <div>
+                        <h3 style={{ fontWeight: '900', color: '#9a3412', margin: 0, fontSize: '16px' }}>
+                            Clientes Inativos
+                        </h3>
+                        <p style={{ fontSize: '12px', color: '#92400e', margin: '2px 0 0', fontWeight: '500' }}>
+                            {clientesInativos.length === 0
+                                ? 'Nenhum cliente inativo no momento. Todos compraram nos últimos 30 dias!'
+                                : `${clientesInativos.length} cliente${clientesInativos.length > 1 ? 's' : ''} sem comprar há mais de 30 dias.`}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Botão de download — só exibe se há clientes inativos */}
+                {clientesInativos.length > 0 && (
+                    <button
+                        onClick={handleBaixarDocumento}
+                        style={{
+                            background: '#9a3412',
+                            color: '#fff',
+                            padding: '10px 18px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            fontWeight: '700',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            flexShrink: 0,
+                        }}
+                    >
+                        <i className="ph-bold ph-download-simple"></i> Baixar Documento
+                    </button>
+                )}
+            </div>
+
+            {/* ── ESTADO VAZIO ── */}
+            {clientesInativos.length === 0 && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '1.5rem', padding: '3rem', textAlign: 'center' }}>
+                    <i className="ph-bold ph-check-circle" style={{ fontSize: '48px', color: '#22c55e', marginBottom: '1rem', display: 'block' }}></i>
+                    <p style={{ fontSize: '15px', fontWeight: '700', color: '#166534', margin: 0 }}>Tudo certo! Nenhum cliente inativo.</p>
+                    <p style={{ fontSize: '12px', color: '#15803d', marginTop: '4px' }}>Todos os clientes compraram nos últimos 30 dias.</p>
+                </div>
+            )}
+
+            {/* ── LEGENDA DE CORES ── */}
+            {clientesInativos.length > 0 && (
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '700', color: '#92400e' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#fb923c', display: 'inline-block' }}></span>
+                        30–59 dias (Atenção)
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '700', color: '#991b1b' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }}></span>
+                        60+ dias (Crítico)
+                    </span>
+                </div>
+            )}
+
+            {/* ── GRID DE CARDS ── */}
+            {clientesInativos.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+                    {clientesInativos.map((cliente) => {
+                        const cor = corUrgencia(cliente.diasInativos);
+                        return (
+                            <div
+                                key={cliente.phone}
+                                style={{
+                                    background: cor.bg,
+                                    border: `1.5px solid ${cor.borda}`,
+                                    borderRadius: '1.25rem',
+                                    padding: '1.25rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.75rem',
+                                }}
+                            >
+                                {/* Nome e badge de urgência */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                    <div>
+                                        <p style={{ fontWeight: '800', color: cor.texto, fontSize: '14px', margin: 0, lineHeight: 1.2 }}>{cliente.name}</p>
+                                        <p style={{ fontSize: '12px', color: cor.texto, opacity: 0.75, margin: '4px 0 0', fontWeight: '500' }}>{formatarTelefone(cliente.phone)}</p>
+                                    </div>
+                                    <span style={{
+                                        background: cor.badge,
+                                        color: '#fff',
+                                        fontSize: '10px',
+                                        fontWeight: '900',
+                                        padding: '4px 10px',
+                                        borderRadius: '9999px',
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                    }}>
+                                        {cliente.diasInativos} dias sem comprar
+                                    </span>
+                                </div>
+
+                                {/* Data da última compra */}
+                                <p style={{ fontSize: '11px', color: cor.texto, opacity: 0.7, margin: 0, display: 'flex', alignItems: 'center', gap: '5px', fontWeight: '600' }}>
+                                    <i className="ph-bold ph-calendar-check"></i>
+                                    Última compra: {cliente.ultimaCompraStr}
+                                </p>
+
+                                {/* Botão WhatsApp — link puro, sem API */}
+                                <a
+                                    href={montarLinkWhatsApp(cliente.phone, cliente.name)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        background: '#16a34a',
+                                        color: '#fff',
+                                        padding: '10px 14px',
+                                        borderRadius: '10px',
+                                        fontWeight: '700',
+                                        fontSize: '13px',
+                                        textDecoration: 'none',
+                                        transition: 'opacity .15s',
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                                >
+                                    <i className="ph-bold ph-whatsapp-logo" style={{ fontSize: '18px' }}></i>
+                                    Chamar no WhatsApp
+                                </a>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
    AdminPanel — COMPONENTE PRINCIPAL DO PAINEL ADMINISTRATIVO
    ═══════════════════════════════════════════════════════════════════════
    Este é o componente que renderiza toda a interface de administração
@@ -883,6 +1423,7 @@ const describeThermalPrintError = (error) => {
    - finance: Financeiro (fluxo de caixa, fechamento diário, exportação)
    - feedbacks: Feedbacks (pesquisas de satisfação dos clientes)
    - campaigns: Campanhas (criação, edição, ativação automática)
+   - inativos: Clientes Inativos (alerta de clientes sem compra há >30 dias)
    - settings: Configurações (site mode, taxa de entrega, PIX, impressão)
 
    HOOKS DE DOMÍNIO (lógica de negócio separada):
@@ -897,6 +1438,19 @@ const describeThermalPrintError = (error) => {
    - Controle de escassez e modo evento
    - Gerenciamento de abas do cardápio público
    ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Informa se a automação WhatsApp via n8n está ligada conforme documento Firestore (`site_settings`),
+ * espelhando a lógica do backend em `functions/n8nWhatsAppIntegration.js`: aceita `true` booleano ou string `"true"` (edição manual no console).
+ *
+ * @param {{ n8nWhatsAppAutomationsEnabled?: boolean|string }} configuracaoOuSiteSettings — snapshot parcial ou `siteSettings` completo do painel.
+ * @returns {boolean} `true` somente quando a flag está explicitamente ativa para o servidor.
+ */
+function lerFlagN8nAutomacoesNaConfiguracaoAdmin(configuracaoOuSiteSettings) {
+    const flag = configuracaoOuSiteSettings && configuracaoOuSiteSettings.n8nWhatsAppAutomationsEnabled;
+    return flag === true || flag === 'true';
+}
+
 const AdminPanel = ({
     allOrders,
     allCoupons,
@@ -928,6 +1482,21 @@ const AdminPanel = ({
        - newMenuTabLabel: nome da nova aba do cardápio sendo criada
        - menuTabsSaving: flag de salvamento das abas do cardápio */
     const [tab, setTab] = useState('orders');
+    /** Componentes reutilizáveis do painel (admin-toggle-pill, admin-settings-card, vitrine ecra fechada). */
+    const PainelInterruptorToggle = window.HeloAdminUi?.AdminTogglePill || null;
+    const CartaoRealAdminSettingsCard = window.HeloAdminUi?.AdminSettingsCard;
+    /** Fallback quando o bundle admin-settings-card falha (cache estragado): mesmo visual inline que existia antes. */
+    const CartaoConfigLegacyOperacaoFallback = ({ children, estaLojaFechadaRascunho }) => (
+        <div style={{
+            background: estaLojaFechadaRascunho ? 'linear-gradient(135deg,#fff7ed,#fef3c7)' : '#fff',
+            padding: '1.5rem',
+            borderRadius: '1.5rem',
+            border: `2px solid ${estaLojaFechadaRascunho ? '#d97706' : 'var(--primary)'}`,
+            boxShadow: estaLojaFechadaRascunho ? '0 18px 36px -28px rgba(146,64,14,.55)' : '0 18px 36px -30px rgba(42,61,93,.35)',
+        }}>{children}</div>
+    );
+    const CartaoConfiguracaoAdmin = CartaoRealAdminSettingsCard || CartaoConfigLegacyOperacaoFallback;
+    const VitrineEcranLojaFechadaPrev = window.HeloComponents?.VitrineStoreClosed;
     const [prodTab, setProdTab] = useState('dash');
     const [feedbackFilter, setFeedbackFilter] = useState('all');
     const [feedbackStatusFilter, setFeedbackStatusFilter] = useState('all');
@@ -957,16 +1526,29 @@ const AdminPanel = ({
     const [storyPreview, setStoryPreview] = useState(null);
     const [feedbackBusyId, setFeedbackBusyId] = useState(null);
 
+    /** Virtualização da tabela Fluxo de Pedidos — só linhas visíveis no DOM (notebook fraco). */
+    const fluxoPedidosScrollRef = useRef(null);
+    const [fluxoPedidosVirtual, setFluxoPedidosVirtual] = useState({ scrollTop: 0, viewportHeight: 560 });
+    const onFluxoPedidosScroll = useCallback((e) => {
+        const elemento = e.currentTarget;
+        setFluxoPedidosVirtual({
+            scrollTop: elemento.scrollTop,
+            viewportHeight: elemento.clientHeight || 560,
+        });
+    }, []);
+
     /* ── Estados de configurações e campanhas ────────────────────────
        - localSettings: cópia local de siteSettings (editável antes de salvar)
          Inclui: maxUnits, orderDeadline, siteMode, campaignMode,
-         isDeliveryAvailable, chavePix, menuTabs, config térmica
+         isDeliveryAvailable, chavePix, infinityPayEnabled, n8nWhatsAppAutomationsEnabled,
+         storeClosed,
+         menuTabs, config térmica
        - campaignDrafts: rascunhos de edição de campanhas (id → dados)
        - campaignForm: formulário de criação/edição de campanha
        - settingsSaving: flag de salvamento das configurações
        - thermalPrintTesting: flag de teste de impressão térmica
        - reprintBusyId: ID do pedido sendo reimpresso */
-    const [localSettings, setLocalSettings] = useState({ maxUnits: 70, orderDeadline: '2026-03-31T19:00', siteMode: 'livre', enableAnnouncement: false, announcementText: '', announcementStyle: 'info', enableScarcityBanner: true, campaignMode: CAMPAIGN_MODE_MANUAL, activeCampaignOverrideId: '', isDeliveryAvailable: true, chavePix: '88996549074', nomeTitularPix: '', menuTabs: DEFAULT_MENU_TAB_OPTIONS.map(option => ({ ...option })), ...DEFAULT_THERMAL_PRINT_SETTINGS });
+    const [localSettings, setLocalSettings] = useState({ maxUnits: 70, orderDeadline: '2026-03-31T19:00', siteMode: 'livre', enableAnnouncement: false, announcementText: '', announcementStyle: 'info', enableScarcityBanner: true, campaignMode: CAMPAIGN_MODE_MANUAL, activeCampaignOverrideId: '', isDeliveryAvailable: true, chavePix: '88996549074', nomeTitularPix: '', infinityPayEnabled: false, n8nWhatsAppAutomationsEnabled: false, storeClosed: false, menuTabs: DEFAULT_MENU_TAB_OPTIONS.map(option => ({ ...option })), ...DEFAULT_THERMAL_PRINT_SETTINGS });
     const [campaignDrafts, setCampaignDrafts] = useState({});
     const [campaignForm, setCampaignForm] = useState({ id: '', nome: '', autoEnabled: false, startDate: '', endDate: '', priority: 0 });
     const [settingsSaving, setSettingsSaving] = useState(false);
@@ -1038,6 +1620,9 @@ const AdminPanel = ({
     const [operationRecentConcludedOrders, setOperationRecentConcludedOrders] = useState([]);
     const [operationNowMs, setOperationNowMs] = useState(() => Date.now());
     const [insightsCampaignFilter, setInsightsCampaignFilter] = useState(activeCampaignId || CAMPAIGN_GENERAL_ID);
+    /* Ranking Top Clientes: período civil/rolling e métrica (valor vs qtd. pedidos) */
+    const [rankingPeriodoAtivo, setRankingPeriodoAtivo] = useState('mes');
+    const [rankingMetricaAtiva, setRankingMetricaAtiva] = useState('spent');
     /* ── Estados da aba Agenda (CRM) ──────────────────────────────────
        adminSchedules: lista de agendamentos do Firebase
        scheduleForm: formulário de criação/edição de agendamento
@@ -1242,6 +1827,16 @@ const AdminPanel = ({
     const dupSet = useMemo(() => {
         if (tab !== 'orders') return new Set();
         return buildDuplicateSet(allOrders);
+    }, [allOrders, tab]);
+
+    /** Mapa pedido.id → índice em allOrders para marcar duplicados sem findIndex por linha (virtualização). */
+    const orderDupSourceIndexById = useMemo(() => {
+        const mapa = new Map();
+        if (tab !== 'orders') return mapa;
+        (Array.isArray(allOrders) ? allOrders : []).forEach((item, indice) => {
+            if (item?.id) mapa.set(item.id, indice);
+        });
+        return mapa;
     }, [allOrders, tab]);
 
     const filteredMenuProducts = useMemo(() => {
@@ -1943,10 +2538,67 @@ const AdminPanel = ({
         return sorted;
     }, [orderCampaignScopedOrders, orderCategoryFilter, orderPaymentFilter, search, getOrderCategoryLabels, buildOrderSearchText]);
 
+    /**
+     * Recorte da lista filtrada para renderizar só linhas na janela de scroll + overscan.
+     * Altura de linha estimada fixa (pedidos com muitos itens podem variar ligeiramente no scroll).
+     */
+    const fluxoPedidosVirtualWindow = useMemo(() => {
+        const ALTURA_LINHA_ESTIMADA = 152;
+        const OVERSCAN = 6;
+        const total = filtered.length;
+        const alturaViewport = Math.max(280, fluxoPedidosVirtual.viewportHeight || 520);
+        const scrollSuperior = fluxoPedidosVirtual.scrollTop;
+        const indiceInicio = Math.max(0, Math.floor(scrollSuperior / ALTURA_LINHA_ESTIMADA) - OVERSCAN);
+        const linhasVisiveis = Math.ceil(alturaViewport / ALTURA_LINHA_ESTIMADA) + OVERSCAN * 2;
+        const indiceFim = Math.min(total, indiceInicio + linhasVisiveis);
+        return {
+            start: indiceInicio,
+            end: indiceFim,
+            padTop: indiceInicio * ALTURA_LINHA_ESTIMADA,
+            padBottom: Math.max(0, (total - indiceFim) * ALTURA_LINHA_ESTIMADA),
+            rowHeight: ALTURA_LINHA_ESTIMADA,
+        };
+    }, [filtered, fluxoPedidosVirtual]);
+
+    /** Mede altura útil do viewport da tabela virtualizada após montar ou redimensionar. */
+    useEffect(() => {
+        if (tab !== 'orders') return undefined;
+        const medirViewport = () => {
+            const elemento = fluxoPedidosScrollRef.current;
+            if (!elemento) return;
+            const altura = elemento.clientHeight;
+            if (altura > 0) {
+                setFluxoPedidosVirtual((prev) => ({ ...prev, viewportHeight: altura }));
+            }
+        };
+        medirViewport();
+        const atrasoInicial = window.setTimeout(medirViewport, 50);
+        window.addEventListener('resize', medirViewport);
+        return () => {
+            clearTimeout(atrasoInicial);
+            window.removeEventListener('resize', medirViewport);
+        };
+    }, [tab, filtered.length]);
+
     const insightsOrders = useMemo(() => {
         if (insightsCampaignFilter === 'all') return normalizedOrders;
         return normalizedOrders.filter(o => normalizeCampaignId(o.campaignId, CAMPAIGN_LEGACY_ID) === insightsCampaignFilter);
     }, [normalizedOrders, insightsCampaignFilter]);
+
+    const {
+        loading: rankingClientesLoading,
+        erro: rankingClientesErro,
+        atingiuLimite: rankingClientesAtingiuLimite,
+        pedidosCarregados: rankingClientesPedidosCarregados,
+        rankingPorPeriodo,
+        recarregar: recarregarRankingClientes,
+    } = useRankingClientesPeriodo({
+        tab,
+        db,
+        insightsCampaignFilter,
+        normalizeCampaignId,
+        CAMPAIGN_LEGACY_ID,
+    });
 
     // Cria um mapa de nome atual do catálogo por productId.
     // Recebe: lista de produtos já carregada no admin.
@@ -1963,19 +2615,25 @@ const AdminPanel = ({
     }, [products]);
 
     const topCustomers = useMemo(() => {
-        const stats = {};
-        insightsOrders.forEach(o => {
-            const ph = safeText(o.customerPhone, 'Desconhecido');
-            if (!stats[ph]) stats[ph] = { phone: ph, names: new Set(), spent: 0, count: 0, unitsCount: 0 };
-            stats[ph].spent += Number(o.total || 0);
-            stats[ph].count++;
-            let unitsInOrder = 0;
-            if (Array.isArray(o.items)) o.items.forEach(item => { unitsInOrder += Number(item?.qty || 1); });
-            stats[ph].unitsCount += unitsInOrder;
-            if (o.customerName) stats[ph].names.add(safeText(o.customerName));
-        });
-        return Object.values(stats).map(c => ({ ...c, name: Array.from(c.names).join(' / ') || 'Cliente' })).sort((a, b) => b.spent - a.spent);
-    }, [insightsOrders]);
+        const blocoPeriodo = rankingPorPeriodo?.[rankingPeriodoAtivo];
+        if (!blocoPeriodo) return [];
+        const lista = rankingMetricaAtiva === 'count'
+            ? blocoPeriodo.porPedidos
+            : blocoPeriodo.porValor;
+        const rankingLista = Array.isArray(lista) ? lista : [];
+        const limiteTabela = window.HeloClientRanking?.obterTopN
+            ? window.HeloClientRanking.obterTopN(rankingLista, 50)
+            : rankingLista.slice(0, 50);
+        return limiteTabela;
+    }, [rankingPorPeriodo, rankingPeriodoAtivo, rankingMetricaAtiva]);
+
+    const rankingPeriodoRotulo = useMemo(() => (
+        rankingPorPeriodo?.[rankingPeriodoAtivo]?.limites?.rotulo || ''
+    ), [rankingPorPeriodo, rankingPeriodoAtivo]);
+
+    const melhorClienteAtual = useMemo(() => (
+        topCustomers.length > 0 ? topCustomers[0] : null
+    ), [topCustomers]);
 
     // Consolida o ranking de vendas por produto para a aba Clientes > Desempenho de Produtos.
     // Recebe: pedidos filtrados por campanha (insightsOrders) e catálogo atual (productCatalogNameById).
@@ -2090,7 +2748,9 @@ const AdminPanel = ({
             orderDeadline: siteSettings.orderDeadline || '2026-03-31T19:00',
             siteMode: siteSettings.siteMode || 'livre',
             enableAnnouncement: siteSettings.enableAnnouncement ?? false,
-            announcementText: siteSettings.announcementText || '',
+            announcementText: (typeof window !== 'undefined' && window.HeloCoreUtils && typeof window.HeloCoreUtils.corrigirMoibakeComumMarketing === 'function'
+                ? window.HeloCoreUtils.corrigirMoibakeComumMarketing(siteSettings.announcementText || '')
+                : String(siteSettings.announcementText || '')),
             announcementStyle: siteSettings.announcementStyle || 'info',
             enableScarcityBanner: siteSettings.enableScarcityBanner ?? true,
             campaignMode: normalizeCampaignMode(siteSettings.campaignMode),
@@ -2098,6 +2758,9 @@ const AdminPanel = ({
             isDeliveryAvailable: siteSettings.isDeliveryAvailable !== undefined ? Boolean(siteSettings.isDeliveryAvailable) : true,
             chavePix: siteSettings.chavePix || '88996549074',
             nomeTitularPix: siteSettings.nomeTitularPix || '',
+            infinityPayEnabled: siteSettings.infinityPayEnabled === true,
+            n8nWhatsAppAutomationsEnabled: lerFlagN8nAutomacoesNaConfiguracaoAdmin(siteSettings),
+            storeClosed: siteSettings.storeClosed === true,
             menuTabs: buildMenuTabOptions({ siteSettings }).map(option => ({ ...option })),
             ...normalizeThermalPrintSettings({
                 thermalPrintEnabled: siteSettings.thermalPrintEnabled,
@@ -2978,6 +3641,9 @@ const AdminPanel = ({
                     isDeliveryAvailable: Boolean(localSettings.isDeliveryAvailable),
                     chavePix: safeText(localSettings.chavePix).trim(),
                     nomeTitularPix: safeText(localSettings.nomeTitularPix).trim(),
+                    infinityPayEnabled: Boolean(localSettings.infinityPayEnabled),
+                    n8nWhatsAppAutomationsEnabled: Boolean(localSettings.n8nWhatsAppAutomationsEnabled),
+                    storeClosed: Boolean(localSettings.storeClosed),
                     menuTabs: menuTabsToPersist,
                     thermalPrintEnabled: Boolean(localSettings.thermalPrintEnabled),
                     thermalPrintAutoOnOrder: Boolean(localSettings.thermalPrintAutoOnOrder),
@@ -3321,6 +3987,15 @@ const AdminPanel = ({
                     });
                 }
                 await batch.commit();
+
+                /* ── Fix 2: Marca stockRestoredAt ANTES de deletar ──────────────
+                   A CF restoreOrderStockOnDelete dispara ao deletar o documento e
+                   verifica este campo para evitar restaurar estoque duas vezes.
+                   Se não marcarmos aqui, a CF recebe o snapshot sem o campo e
+                   incrementa o estoque de novo (duplicação de unidades). */
+                await getCol('orders').doc(id).update({
+                    'stockReservation.stockRestoredAt': firebase.firestore.FieldValue.serverTimestamp(),
+                });
             } else if (!alreadyRestored) {
                 const items = Array.isArray(orderData.items) ? orderData.items : [];
                 const qtyMap = new Map();
@@ -3341,6 +4016,13 @@ const AdminPanel = ({
                         }
                     }
                     await batch.commit();
+
+                    /* ── Fix 2 (fallback): mesma proteção contra dupla restauração ──
+                       Mesmo no caminho de fallback (sem stockReservation.decremented),
+                       marcamos stockRestoredAt para que a CF não restaure de novo. */
+                    await getCol('orders').doc(id).update({
+                        'stockReservation.stockRestoredAt': firebase.firestore.FieldValue.serverTimestamp(),
+                    });
                 }
             }
 
@@ -3704,6 +4386,13 @@ const AdminPanel = ({
             }
 
             if (!window.qz) {
+                try {
+                    await loadQzTrayScript();
+                } catch (_) {
+                    /* Mensagem unificada abaixo se continuar sem window.qz */
+                }
+            }
+            if (!window.qz) {
                 setThermalDiag({
                     checking: false,
                     lastCheckedAt: startedAt,
@@ -3711,7 +4400,7 @@ const AdminPanel = ({
                     qzConnected: false,
                     printerFound: false,
                     printerName: '',
-                    message: 'QZ script não detectado na página.',
+                    message: 'QZ script não detectado na página (instale QZ Tray ou verifique a rede).',
                 });
                 return;
             }
@@ -3890,18 +4579,42 @@ const AdminPanel = ({
                 return;
             }
 
+            /* ── Fix 1: Flag de conclusão forçada pelo admin ────────────────
+               Quando o admin aceita concluir um pedido com failed_insufficient_stock,
+               gravamos adminForcedConclusion=true no payload para que a CF
+               preventOrderConclusionWithoutStockReservation saiba respeitar
+               a decisão explícita do admin e não reverter o status. */
+            let adminForcedConclusion = false;
+
             if (nextStatusKey === ORDER_STATUS_CONCLUDED_KEY) {
                 const reservationStatus = safeText(order?.stockReservation?.status).trim();
-                const concludableReservationStatuses = ['applied', 'no_limited_products', 'skipped_no_product_ids'];
-                if (!concludableReservationStatuses.includes(reservationStatus)) {
-                    const reason = safeText(order?.stockReservation?.reason).trim();
-                    const reasonLine = reason ? `\n\nMotivo técnico: ${reason}` : '';
-                    alert(
-                        'Não é possível concluir este pedido enquanto a baixa de estoque não estiver válida.\n' +
-                        'Ajuste o estoque e/ou valide a reserva antes de concluir.' +
-                        reasonLine
+
+                if (reservationStatus === 'failed_insufficient_stock') {
+                    const insufficientItems = order?.stockReservation?.insufficientItems;
+                    const itemsLine = Array.isArray(insufficientItems) && insufficientItems.length > 0
+                        ? `\n\nItens com problema:\n${insufficientItems.map(i => `• ${i.productId} (pedido: ${i.requestedQty}, disponível: ${i.availableStock})`).join('\n')}`
+                        : '';
+                    const forceOk = confirm(
+                        'ATENÇÃO: A reserva de estoque deste pedido falhou por estoque insuficiente.\n\n' +
+                        'Use esta opção APENAS se o estoque já foi ajustado manualmente ou o item foi substituído/negociado com o cliente.' +
+                        itemsLine +
+                        '\n\nDeseja concluir mesmo assim?'
                     );
-                    return;
+                    if (!forceOk) return;
+                    // Admin confirmou → sinaliza para o payload e para a CF
+                    adminForcedConclusion = true;
+                } else {
+                    const concludableReservationStatuses = ['applied', 'no_limited_products', 'skipped_no_product_ids'];
+                    if (!concludableReservationStatuses.includes(reservationStatus)) {
+                        const reason = safeText(order?.stockReservation?.reason).trim();
+                        const reasonLine = reason ? `\n\nMotivo técnico: ${reason}` : '';
+                        alert(
+                            'Não é possível concluir este pedido enquanto a baixa de estoque não estiver válida.\n' +
+                            'Ajuste o estoque e/ou valide a reserva antes de concluir.' +
+                            reasonLine
+                        );
+                        return;
+                    }
                 }
             }
 
@@ -3915,6 +4628,11 @@ const AdminPanel = ({
                     // Ao concluir, grava timestamps de servidor para auditoria e janela de ocultação.
                     payload.completedAt = firebase.firestore.FieldValue.serverTimestamp();
                     payload.concluidoEm = firebase.firestore.FieldValue.serverTimestamp();
+                    // Se o admin forçou a conclusão, sinaliza para a CF não reverter
+                    if (adminForcedConclusion) {
+                        payload['stockReservation.adminForcedConclusion'] = true;
+                        payload['stockReservation.adminForcedConclusionAt'] = firebase.firestore.FieldValue.serverTimestamp();
+                    }
                 }
                 if (!order.paidAt) payload.paidAt = firebase.firestore.FieldValue.serverTimestamp();
                 await orderRef.update(payload);
@@ -4484,7 +5202,12 @@ const AdminPanel = ({
             { k: 'drivers', l: 'Entregadores', icon: 'ph-motorcycle' }
         ] },
         { k: 'catalog', l: 'Catálogo', icon: 'ph-storefront', tabs: [{ k: 'menu', l: 'Cardápio' }, { k: 'coupons', l: 'Cupões' }] },
-        { k: 'clients', l: 'Clientes', icon: 'ph-users-three', tabs: [{ k: 'customers', l: 'Top Clientes' }, { k: 'top-pedidos', l: 'Top Pedidos' }, { k: 'visits', l: 'Acessos' }] },
+        { k: 'clients', l: 'Clientes', icon: 'ph-users-three', tabs: [
+            { k: 'customers', l: 'Top Clientes' },
+            { k: 'top-pedidos', l: 'Top Pedidos' },
+            { k: 'inativos', l: 'Inativos' },
+            { k: 'visits', l: 'Acessos' },
+        ] },
         { k: 'production', l: 'Produção', icon: 'ph-package', tabs: [{ k: 'production', l: 'Estoque & Produção' }] },
         { k: 'system', l: 'Sistema', icon: 'ph-gear-six', tabs: [{ k: 'settings', l: 'Configurações' }, { k: 'payments', l: 'Pagamentos' }] },
     ];
@@ -4971,7 +5694,12 @@ ${feedbackUrl}`;
                                     )}
                                 </div>
                             </div>
-                            <div style={{ overflowX: 'auto' }} className="hide-scrollbar">
+                            <div
+                                ref={fluxoPedidosScrollRef}
+                                onScroll={onFluxoPedidosScroll}
+                                style={{ maxHeight: 'min(72vh, 720px)', overflow: 'auto' }}
+                                className="hide-scrollbar"
+                            >
                                 <table style={{ width: '100%', textAlign: 'left', fontSize: '13px', whiteSpace: 'nowrap', borderCollapse: 'collapse' }}>
                                     <thead style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--s400)', fontWeight: '700', background: '#f8fafc' }}>
                                         <tr>
@@ -4981,8 +5709,14 @@ ${feedbackUrl}`;
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filtered.map((o, idx) => {
-                                            const isDup = dupSet.has(allOrders.findIndex(x => x.id === o.id));
+                                        {fluxoPedidosVirtualWindow.padTop > 0 && (
+                                            <tr aria-hidden="true" style={{ pointerEvents: 'none' }}>
+                                                <td colSpan={6} style={{ padding: 0, border: 'none', height: fluxoPedidosVirtualWindow.padTop }} />
+                                            </tr>
+                                        )}
+                                        {filtered.slice(fluxoPedidosVirtualWindow.start, fluxoPedidosVirtualWindow.end).map((o) => {
+                                            const indiceDupOrigem = orderDupSourceIndexById.get(o.id);
+                                            const isDup = typeof indiceDupOrigem === 'number' && dupSet.has(indiceDupOrigem);
                                             const _rowTotal = Number(o.total || 0);
                                             const _rowPaidRaw = Number(o.paidAmount);
                                             const _rowStatus = safeText(o.status, 'Novo');
@@ -5112,6 +5846,7 @@ ${feedbackUrl}`;
                                                                 )
                                                             }}>
                                                             <option value="Novo">🚨 NOVO</option>
+                                                            <option value="AguardandoPagamento">⏳ AGUARDANDO PIX</option>
                                                             <option value="Confirmado">💬 CONFIRMADO</option>
                                                             <option value="Pago">💰 PAGO</option>
                                                             <option value="Pronto">📦 PRONTO</option>
@@ -5140,6 +5875,11 @@ ${feedbackUrl}`;
                                                 </tr>
                                             );
                                         })}
+                                        {fluxoPedidosVirtualWindow.padBottom > 0 && (
+                                            <tr aria-hidden="true" style={{ pointerEvents: 'none' }}>
+                                                <td colSpan={6} style={{ padding: 0, border: 'none', height: fluxoPedidosVirtualWindow.padBottom }} />
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                                 {filtered.length === 0 && (
@@ -5733,6 +6473,7 @@ ${feedbackUrl}`;
                                                             )
                                                         }}>
                                                         <option value="Novo">NOVO</option>
+                                                        <option value="AguardandoPagamento">AGUARDANDO PIX</option>
                                                         <option value="Confirmado">CONFIRMADO</option>
                                                         <option value="Pago">PAGO</option>
                                                         <option value="Pronto">PRONTO</option>
@@ -6860,10 +7601,53 @@ ${feedbackUrl}`;
                                         <option value="all">Todas as campanhas</option>
                                         {campaignOptions.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                                     </select>
+                                    <button type="button" onClick={recarregarRankingClientes} disabled={rankingClientesLoading} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', color: 'var(--primary)', padding: '10px 14px', borderRadius: '12px', fontWeight: '700', border: '1px solid #e2e8f0', cursor: rankingClientesLoading ? 'wait' : 'pointer' }}>
+                                        <i className={`ph-bold ph-arrows-clockwise${rankingClientesLoading ? ' ph-spin' : ''}`}></i> Atualizar
+                                    </button>
                                     <button onClick={gerarStoryClientes} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary)', color: 'var(--cream)', padding: '10px 18px', borderRadius: '12px', fontWeight: '700', border: 'none', cursor: 'pointer', transition: 'all .2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
                                         <i className="ph-bold ph-instagram-logo" style={{ fontSize: '20px' }}></i> Criar Story (Instagram)
                                     </button>
                                 </div>
+                            </div>
+                            <div style={{ padding: '0 1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid #f1f5f9' }} data-ranking-filtros="true">
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--s400)', textTransform: 'uppercase', letterSpacing: '.06em', marginRight: '4px' }}>Período</span>
+                                    {[
+                                        { id: 'hoje', label: 'Hoje' },
+                                        { id: 'semana', label: 'Semana' },
+                                        { id: 'mes', label: 'Mês' },
+                                        { id: 'rolling7', label: '7 dias' },
+                                        { id: 'rolling30', label: '30 dias' },
+                                    ].map((chip) => (
+                                        <button key={chip.id} type="button" onClick={() => setRankingPeriodoAtivo(chip.id)} style={{ padding: '8px 14px', borderRadius: '9999px', border: rankingPeriodoAtivo === chip.id ? '2px solid var(--gold)' : '1px solid #e2e8f0', background: rankingPeriodoAtivo === chip.id ? '#fffbeb' : '#f8fafc', color: rankingPeriodoAtivo === chip.id ? '#92400e' : 'var(--s600)', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>{chip.label}</button>
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--s400)', textTransform: 'uppercase', letterSpacing: '.06em', marginRight: '4px' }}>Ranking por</span>
+                                    <button type="button" onClick={() => setRankingMetricaAtiva('spent')} style={{ padding: '8px 14px', borderRadius: '9999px', border: rankingMetricaAtiva === 'spent' ? '2px solid var(--primary)' : '1px solid #e2e8f0', background: rankingMetricaAtiva === 'spent' ? '#eff6ff' : '#f8fafc', color: 'var(--primary)', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Valor (R$)</button>
+                                    <button type="button" onClick={() => setRankingMetricaAtiva('count')} style={{ padding: '8px 14px', borderRadius: '9999px', border: rankingMetricaAtiva === 'count' ? '2px solid var(--primary)' : '1px solid #e2e8f0', background: rankingMetricaAtiva === 'count' ? '#eff6ff' : '#f8fafc', color: 'var(--primary)', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Qtd. pedidos</button>
+                                </div>
+                                {rankingPeriodoRotulo && <p style={{ margin: 0, fontSize: '12px', color: 'var(--s500)' }}>{rankingPeriodoRotulo}</p>}
+                                {rankingClientesErro && <p style={{ margin: 0, fontSize: '12px', color: '#b91c1c', fontWeight: '600' }}>{rankingClientesErro}</p>}
+                                {rankingClientesAtingiuLimite && (
+                                    <p style={{ margin: 0, fontSize: '12px', color: '#92400e', fontWeight: '600' }}>
+                                        Atenção: foram carregados {rankingClientesPedidosCarregados} pedidos (limite de consulta). O ranking pode estar incompleto em períodos muito movimentados.
+                                    </p>
+                                )}
+                                {melhorClienteAtual && !rankingClientesLoading && (
+                                    <div style={{ marginTop: '4px', padding: '1rem 1.25rem', borderRadius: '14px', background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', border: '1px solid #fde68a', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div>
+                                            <p style={{ margin: 0, fontSize: '11px', fontWeight: '800', color: '#92400e', textTransform: 'uppercase' }}>Melhor cliente do período</p>
+                                            <p style={{ margin: '4px 0 0', fontSize: '1.25rem', fontWeight: '800', color: 'var(--primary)' }}>{melhorClienteAtual.name}</p>
+                                            <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--s500)' }}>{melhorClienteAtual.phone}</p>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <p style={{ margin: 0, fontSize: '12px', color: 'var(--s500)' }}>{melhorClienteAtual.count} pedido(s) · {melhorClienteAtual.unitsCount} un.</p>
+                                            <p style={{ margin: '4px 0 0', fontSize: '1.35rem', fontWeight: '900', color: 'var(--gold)' }}>R$ {Number(melhorClienteAtual.spent || 0).toFixed(2)}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {rankingClientesLoading && <p style={{ margin: 0, fontSize: '12px', color: 'var(--s500)' }}>Carregando ranking…</p>}
                             </div>
                             <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
@@ -7473,6 +8257,11 @@ ${feedbackUrl}`
                     </div>
                 )}
 
+                {/* ABA CLIENTES INATIVOS: lista clientes sem compra há >30 dias */}
+                {tab === 'inativos' && (
+                    <ClientesInativosAlerta allOrders={allOrders} />
+                )}
+
                 {/* ABA 9: Configurações */}
                 {/* ABA PAGAMENTOS: configuração dinâmica da chave PIX e titular */}
                 {tab === 'payments' && (
@@ -7484,6 +8273,28 @@ ${feedbackUrl}`
                                 <i className="ph-bold ph-qr-code" style={{ color: 'var(--gold)', fontSize: '22px' }}></i> Chave PIX para Recebimento
                             </h3>
                             <p style={{ fontSize: '12px', color: 'var(--s500)', marginBottom: '1.25rem' }}>Configure a chave PIX que será exibida aos clientes no checkout para pagamento. Alterações são refletidas em tempo real na loja.</p>
+
+                            {/* ── Toggle InfinitePay vs PIX clássico (WhatsApp) ── */}
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '1.25rem', padding: '14px 16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontSize: '13px', fontWeight: '800', color: 'var(--primary)', margin: '0 0 6px' }}>Checkout PIX InfinitePay</p>
+                                    <p style={{ fontSize: '11px', color: 'var(--s500)', lineHeight: 1.55, margin: 0 }}>
+                                        <strong>Ligado:</strong> cliente vai ao checkout InfinitePay e volta à página de confirmação (requer API + Make configurados).<br />
+                                        <strong>Desligado:</strong> modo atual — chave PIX no carrinho e pedido finalizado pelo WhatsApp (recomendado até concluir testes).
+                                    </p>
+                                </div>
+                                {PainelInterruptorToggle ? (
+                                    <PainelInterruptorToggle
+                                        ligado={Boolean(localSettings.infinityPayEnabled)}
+                                        aoAlternar={() => setLocalSettings(prev => ({ ...prev, infinityPayEnabled: !Boolean(prev.infinityPayEnabled) }))}
+                                    />
+                                ) : (
+                                    <button type="button" aria-pressed={Boolean(localSettings.infinityPayEnabled)} onClick={() => setLocalSettings(prev => ({ ...prev, infinityPayEnabled: !Boolean(prev.infinityPayEnabled) }))}
+                                        style={{ flexShrink: 0, width: '52px', height: '28px', borderRadius: '9999px', border: 'none', background: localSettings.infinityPayEnabled ? 'var(--primary)' : '#cbd5e1', cursor: 'pointer', position: 'relative', transition: 'background .2s' }}>
+                                        <span style={{ position: 'absolute', top: '4px', left: localSettings.infinityPayEnabled ? '26px' : '4px', width: '20px', height: '20px', background: '#fff', borderRadius: '9999px', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                                    </button>
+                                )}
+                            </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div>
@@ -7515,7 +8326,8 @@ ${feedbackUrl}`
                         <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
                             <p style={{ fontSize: '12px', color: 'var(--s500)', lineHeight: 1.8 }}>
                                 <strong>Chave PIX atual:</strong> {siteSettings.chavePix || '88996549074 (padrão)'}<br />
-                                <strong>Titular:</strong> {siteSettings.nomeTitularPix || 'não definido'}
+                                <strong>Titular:</strong> {siteSettings.nomeTitularPix || 'não definido'}<br />
+                                <strong>InfinitePay no checkout:</strong> {siteSettings.infinityPayEnabled === true ? '✅ Ativo' : '❌ Desativado (PIX + WhatsApp)'}
                             </p>
                         </div>
 
@@ -7527,6 +8339,80 @@ ${feedbackUrl}`
 
                 {tab === 'settings' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+                        {/* ── OPERAÇÃO DA LOJA ── */}
+                        <CartaoConfiguracaoAdmin varianteOperacao estaLojaFechadaRascunho={Boolean(localSettings.storeClosed)}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '1rem' }}>
+                                <div style={{ minWidth: 0 }}>
+                                    <h3 style={{ fontWeight: '800', color: 'var(--primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <i className={`ph-bold ${localSettings.storeClosed ? 'ph-lock-key' : 'ph-storefront'}`} style={{ color: 'var(--gold)', fontSize: '24px' }}></i> Operação da Loja
+                                    </h3>
+                                    <p style={{ fontSize: '12px', color: 'var(--s500)', lineHeight: 1.55 }}>
+                                        Controle emergencial da vitrine pública. Ao desligar, o cardápio, carrinho e finalização somem para clientes, e novos pedidos são bloqueados.
+                                    </p>
+                                </div>
+                                <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '900', letterSpacing: '.08em', textTransform: 'uppercase', padding: '6px 10px', borderRadius: '9999px', background: localSettings.storeClosed ? '#7c2d12' : '#dcfce7', color: localSettings.storeClosed ? '#fff7ed' : '#166534', border: `1px solid ${localSettings.storeClosed ? '#9a3412' : '#86efac'}` }}>
+                                    {localSettings.storeClosed ? 'Loja desligada' : 'Loja aberta'}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                aria-pressed={Boolean(localSettings.storeClosed)}
+                                onClick={() => setLocalSettings(prev => ({ ...prev, storeClosed: !Boolean(prev.storeClosed) }))}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', textAlign: 'left' }}>
+                                <span style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+                                    <strong style={{ color: 'var(--primary)', fontSize: '14px' }}>
+                                        {localSettings.storeClosed ? 'Reabrir a loja para pedidos' : 'Desligar loja temporariamente'}
+                                    </strong>
+                                    <span style={{ color: 'var(--s500)', fontSize: '12px', lineHeight: 1.45 }}>
+                                        {localSettings.storeClosed ? 'O site exibirá novamente catálogo, carrinho e compra depois de salvar.' : 'Clientes verão uma mensagem premium com WhatsApp e Instagram depois de salvar.'}
+                                    </span>
+                                </span>
+                                <span style={{ flexShrink: 0, width: '56px', height: '30px', borderRadius: '9999px', background: localSettings.storeClosed ? '#b91c1c' : 'var(--primary)', position: 'relative', transition: 'background .2s' }}>
+                                    <span style={{ position: 'absolute', top: '4px', left: localSettings.storeClosed ? '30px' : '4px', width: '22px', height: '22px', background: '#fff', borderRadius: '9999px', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                                </span>
+                            </button>
+                            {Boolean(localSettings.storeClosed) !== Boolean(siteSettings.storeClosed) && (
+                                <p style={{ marginTop: '10px', padding: '9px 11px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontSize: '11px', fontWeight: '800', lineHeight: 1.45 }}>
+                                    Alteração ainda não salva. Clique em Salvar Configurações para publicar este estado no site.
+                                </p>
+                            )}
+                        </CartaoConfiguracaoAdmin>
+
+                        {/* ── PREVIEW PÚBLICO (rascunho loja fechada + link vitrine aberta) ── */}
+                        <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0' }}>
+                            <h3 style={{ fontWeight: '800', color: 'var(--primary)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className="ph-bold ph-monitor" style={{ color: 'var(--gold)', fontSize: '22px' }}></i> Pré-visualização pública
+                            </h3>
+                            <p style={{ fontSize: '12px', color: 'var(--s500)', lineHeight: 1.55, marginBottom: '1rem' }}>
+                                Com <strong>loja desligada no rascunho</strong>, o painel mostra o mesmo ecrã público de “atendimento pausado” antes de guardar.
+                                Com <strong>loja aberta</strong>, abra a vitrine noutro separador — o site continua a refletir só o que já está guardado no Firebase.
+                            </p>
+                            {localSettings.storeClosed && Boolean(localSettings.storeClosed) !== Boolean(siteSettings.storeClosed) && (
+                                <p className="admin-preview-banner">Rascunho: o estado do interruptor &quot;Operação da Loja&quot; difere do site publicado até clicar em Salvar Configurações.</p>
+                            )}
+                            {localSettings.storeClosed ? (
+                                VitrineEcranLojaFechadaPrev ? (
+                                    <div className="admin-preview-frame"><VitrineEcranLojaFechadaPrev marcaLogoComponent={BrandLogo} /></div>
+                                ) : (
+                                    <p style={{ fontSize: '12px', color: 'var(--s500)' }}>Componente vitrine não carregado. Recarregue o painel com cache limpo.</p>
+                                )
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px' }}>
+                                    <p style={{ fontSize: '12px', color: 'var(--s600)', margin: 0 }}>
+                                        Estado aberto só pode comparar ao site real depois de guardar mudanças. Use o atalho abaixo.
+                                    </p>
+                                    <a
+                                        href="./index.html"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ padding: '10px 16px', borderRadius: '10px', background: 'var(--primary)', color: 'var(--cream)', fontWeight: '800', fontSize: '13px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                    >
+                                        <i className="ph-bold ph-arrow-square-out"></i> Abrir vitrine (nova aba)
+                                    </a>
+                                </div>
+                            )}
+                        </div>
 
                         {/* ── MODO DO SITE ── */}
                         <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #f1f5f9' }}>
@@ -7561,15 +8447,85 @@ ${feedbackUrl}`
                             </h3>
                             <p style={{ fontSize: '12px', color: 'var(--s500)', marginBottom: '1.25rem' }}>Controle global de disponibilidade de entrega. Quando desativado, clientes só podem escolher retirada no local.</p>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--s600)', flex: 1 }}>Disponibilizar opção de entrega no site</span>
-                                <div onClick={() => setLocalSettings(prev => ({ ...prev, isDeliveryAvailable: !prev.isDeliveryAvailable }))}
-                                    style={{ width: '44px', height: '24px', borderRadius: '9999px', background: localSettings.isDeliveryAvailable ? 'var(--primary)' : '#cbd5e1', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
-                                    <div style={{ position: 'absolute', top: '3px', left: localSettings.isDeliveryAvailable ? '23px' : '3px', width: '18px', height: '18px', background: '#fff', borderRadius: '9999px', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }}></div>
-                                </div>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--s600)', flex: 1 }}>Disponibilizar opção de entrega no site</span>
+                                {PainelInterruptorToggle ? (
+                                    <PainelInterruptorToggle
+                                        ligado={Boolean(localSettings.isDeliveryAvailable)}
+                                        larguraPixels={44}
+                                        alturaPixels={24}
+                                        aoAlternar={() => setLocalSettings(prev => ({ ...prev, isDeliveryAvailable: !prev.isDeliveryAvailable }))}
+                                    />
+                                ) : (
+                                    <div onClick={() => setLocalSettings(prev => ({ ...prev, isDeliveryAvailable: !prev.isDeliveryAvailable }))}
+                                        style={{ width: '44px', height: '24px', borderRadius: '9999px', background: localSettings.isDeliveryAvailable ? 'var(--primary)' : '#cbd5e1', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                                        <div style={{ position: 'absolute', top: '3px', left: localSettings.isDeliveryAvailable ? '23px' : '3px', width: '18px', height: '18px', background: '#fff', borderRadius: '9999px', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }}></div>
+                                    </div>
+                                )}
                             </div>
                             <p style={{ fontSize: '11px', color: localSettings.isDeliveryAvailable ? '#15803d' : '#b91c1c', marginTop: '4px', fontWeight: '600' }}>
                                 {localSettings.isDeliveryAvailable ? '✅ Entrega ATIVA - clientes podem escolher entrega ou retirada' : '❌ Entrega DESATIVADA - apenas retirada no local disponível'}
                             </p>
+                        </div>
+
+                        {/* ── AUTOMÁTICO WhatsApp via n8n (VPS) — interruptor de contingência ── */}
+                        <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #f1f5f9' }}>
+                            <h3 style={{ fontWeight: '700', color: 'var(--primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className="ph-bold ph-robot" style={{ color: 'var(--gold)', fontSize: '22px' }}></i> Mensagens WhatsApp automáticas (n8n)
+                            </h3>
+                            <p style={{ fontSize: '12px', color: 'var(--s500)', marginBottom: '1rem', lineHeight: 1.55 }}>
+                                Liga avisos por webhook nas Cloud Functions: novo pedido (equipe), confirmação ao cliente quando o pedido vai para CONFIRMADO, aviso quando fica PRONTO (texto diferente para entrega e retirada) e convite de feedback por volta de 7 dias após CONCLUSÃO — ver README das Functions (env + URL do webhook).
+                                Desligado: fluxo manual atual permanece — finalização no WhatsApp, botão Copiar mensagem na aba Feedback, sem depender da VPS.
+                            </p>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', padding: '14px 16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontSize: '13px', fontWeight: '800', color: 'var(--primary)', margin: '0 0 6px' }}>Automação n8n ativa no servidor</p>
+                                    <p style={{ fontSize: '11px', color: 'var(--s500)', margin: 0, lineHeight: 1.5 }}>
+                                        <strong>Ligado:</strong> o backend envia eventos quando <code>n8n</code>, integradora WhatsApp e env estão corretos.<br />
+                                        <strong>Desligado:</strong> recomendado em instabilidade — nenhum webhook sai; vendas não param.
+                                    </p>
+                                </div>
+                                {PainelInterruptorToggle ? (
+                                    <PainelInterruptorToggle
+                                        ligado={Boolean(localSettings.n8nWhatsAppAutomationsEnabled)}
+                                        aoAlternar={() => setLocalSettings(prev => ({ ...prev, n8nWhatsAppAutomationsEnabled: !Boolean(prev.n8nWhatsAppAutomationsEnabled) }))}
+                                    />
+                                ) : (
+                                    <button
+                                        type="button"
+                                        aria-pressed={Boolean(localSettings.n8nWhatsAppAutomationsEnabled)}
+                                        onClick={() => setLocalSettings(prev => ({ ...prev, n8nWhatsAppAutomationsEnabled: !Boolean(prev.n8nWhatsAppAutomationsEnabled) }))}
+                                        style={{ flexShrink: 0, width: '52px', height: '28px', borderRadius: '9999px', border: 'none', background: localSettings.n8nWhatsAppAutomationsEnabled ? 'var(--primary)' : '#cbd5e1', cursor: 'pointer', position: 'relative', transition: 'background .2s' }}>
+                                        <span style={{ position: 'absolute', top: '4px', left: localSettings.n8nWhatsAppAutomationsEnabled ? '26px' : '4px', width: '20px', height: '20px', background: '#fff', borderRadius: '9999px', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+                                    </button>
+                                )}
+                            </div>
+                            {(() => {
+                                const persistidoN8n = lerFlagN8nAutomacoesNaConfiguracaoAdmin(siteSettings);
+                                const localN8n = Boolean(localSettings.n8nWhatsAppAutomationsEnabled);
+                                const n8nNaoSalvo = localN8n !== persistidoN8n;
+                                return (
+                                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <p style={{ fontSize: '11px', color: 'var(--s500)', margin: 0, lineHeight: 1.5 }}>
+                                            <strong>Estado salvo no Firebase:</strong>{' '}
+                                            {persistidoN8n ? <span style={{ color: '#15803d', fontWeight: '800' }}>ligado</span> : <span style={{ color: '#64748b', fontWeight: '700' }}>desligado</span>}
+                                            {' — '}só este valor faz as Cloud Functions chamarem o n8n.
+                                        </p>
+                                        {n8nNaoSalvo && (
+                                            <p style={{ fontSize: '11px', margin: 0, padding: '8px 10px', borderRadius: '8px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontWeight: '700' }}>
+                                                O interruptor mudou na tela mas ainda não foi gravado. Clique em <strong>Salvar automação n8n</strong> abaixo ou no botão <strong>Salvar Configurações</strong> no fim desta página.
+                                            </p>
+                                        )}
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+                                            <button type="button" onClick={handleSaveSettings} disabled={settingsSaving} style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: 'var(--cream)', fontWeight: '800', fontSize: '12px', cursor: 'pointer', opacity: settingsSaving ? 0.75 : 1 }}>
+                                                {settingsSaving ? 'Salvando...' : 'Salvar automação n8n no Firebase'}
+                                            </button>
+                                            <span style={{ fontSize: '10px', color: 'var(--s400)', maxWidth: '420px', lineHeight: 1.45 }}>
+                                                Após salvar, teste com um <strong>pedido novo</strong> da vitrine ou altere o status no painel — pedidos antigos não disparam de novo o evento &quot;novo pedido&quot;.
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         {/* ── CONTROLES DE EVENTO (só relevantes no modo evento, mas editáveis sempre) ── */}
@@ -7932,6 +8888,7 @@ ${feedbackUrl}`
                         <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
                             <p style={{ fontSize: '12px', color: 'var(--s500)', lineHeight: 1.8 }}>
                                 <strong>Modo ativo:</strong> {siteSettings.siteMode === 'livre' ? '🛒 Livre (loja aberta)' : '🥚 Evento'}<br />
+                                <strong>Operação da loja:</strong> {siteSettings.storeClosed === true ? '❌ Desligada — cardápio e pedidos ocultos' : '✅ Aberta para pedidos'}<br />
                                 {/* Linha de Unidades e Prazo só aparece em Modo Evento ou se o limitador global estiver ativado */}
                                 {(siteSettings.siteMode === 'evento' || siteSettings.enableScarcityBanner === true) && (
                                     <>
@@ -7940,6 +8897,8 @@ ${feedbackUrl}`
                                 )}
                                 <strong>Campanhas:</strong> {normalizeCampaignMode(localSettings.campaignMode) === CAMPAIGN_MODE_AUTO ? 'Automático' : normalizeCampaignMode(localSettings.campaignMode) === CAMPAIGN_MODE_HYBRID ? 'Híbrido' : 'Manual'} · <strong>Evento em foco:</strong> {safeText(localSettings.activeCampaignOverrideId) ? `${getCampaignName(localSettings.activeCampaignOverrideId)} (override)` : getCampaignName(activeCampaignId)}<br />
                                 <strong>Entrega:</strong> {siteSettings.isDeliveryAvailable !== undefined ? (Boolean(siteSettings.isDeliveryAvailable) ? '✅ Ativa' : '❌ Apenas Retirada') : '✅ Ativa'}<br />
+                                <strong>PIX InfinitePay:</strong> {siteSettings.infinityPayEnabled === true ? '✅ Checkout hospedado' : '❌ Off — cliente usa chave + WhatsApp'}<br />
+                                <strong>WhatsApp automático (n8n):</strong> {lerFlagN8nAutomacoesNaConfiguracaoAdmin(siteSettings) ? '✅ Ligado no Firebase (webhooks ao criar/atualizar pedido)' : '❌ Desligado — Functions não chamam a VPS'}<br />
                                 <strong>Aviso ativo:</strong> {siteSettings.enableAnnouncement ? '✅ Sim' : '❌ Não'} {siteSettings.announcementText ? `— "${String(siteSettings.announcementText).slice(0, 60)}${siteSettings.announcementText.length > 60 ? '...' : ''}"` : ''}<br />
                                 <strong>Impressão local:</strong> {siteSettings.thermalPrintEnabled ? `✅ ${normalizeThermalPrintMode(siteSettings.thermalPrintMode) === 'browser' ? 'Navegador' : 'QZ Tray/ESC-POS'} · ${normalizeThermalPrintTicketMode(siteSettings.thermalPrintTicketMode) === 'kitchen' ? 'somente cozinha' : normalizeThermalPrintTicketMode(siteSettings.thermalPrintTicketMode) === 'cashier' ? 'somente caixa' : 'cozinha + caixa'} · ${Number(siteSettings.thermalPrintCopies) || 1} cópia(s) · ${siteSettings.thermalPrintAutoOnOrder !== false ? 'auto ativo' : 'auto inativo (não imprime ao confirmar)'}` : '❌ Desativada'}
                             </p>
@@ -8494,18 +9453,27 @@ var Cabecalho = (window.HeloComponents && window.HeloComponents.Cabecalho)
 
 var RodapeSite = (window.HeloComponents && window.HeloComponents.RodapeSite)
     ? window.HeloComponents.RodapeSite
-    : React.memo(({ onOpenLogin, operationDays = 'Quarta a domingo', operationHours = '14:30hrs às 20hrs' }) => (
+    : React.memo(({ onOpenLogin, operationDays = 'Quarta a domingo', operationHours = '14:30hrs às 20hrs' }) => {
+        const contatoFb = (typeof window !== 'undefined' && window.HeloPublicContact) ? window.HeloPublicContact : {};
+        const redesRodape = (typeof window !== 'undefined' && typeof window.listaIconesRodapeRedesSociaisHelo === 'function')
+            ? window.listaIconesRodapeRedesSociaisHelo()
+            : [
+                { href: 'https://instagram.com/heloconfeitaria10', icon: 'ph-instagram-logo' },
+                { href: 'https://tiktok.com/@heloconfeitaria10', icon: 'ph-tiktok-logo' },
+                { href: 'https://wa.me/5588981577625', icon: 'ph-whatsapp-logo' },
+            ];
+        const hrefMapsFb = contatoFb.googleMapsUrl || 'https://maps.app.goo.gl/FrmNpC4iGrVxfw8u9';
+        const hrefWhatsFb = contatoFb.whatsAppHrefBase || 'https://wa.me/5588981577625';
+        const linhaEnderecoFb = contatoFb.enderecoCompletoLinhaUm || 'Rua Anastácio Paulo de Sousa, 63 - Nova Aldeota';
+        const telefoneFb = contatoFb.telefoneFormatadoCliente || '(88) 98157-7625';
+        return (
         <footer style={{ marginTop: 'auto', background: 'var(--primary)', paddingTop: '2.4rem', paddingBottom: '1.4rem', borderTop: '6px solid var(--cream)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, padding: '2.5rem', opacity: .05, transform: 'rotate(12deg)', pointerEvents: 'none' }}>
                 <i className="ph-fill ph-crown" style={{ fontSize: '200px', color: 'var(--cream)' }}></i>
             </div>
             <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '0 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative', zIndex: 2 }}>
                 <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.4rem' }}>
-                    {[
-                        { href: 'https://instagram.com/heloconfeitaria10', icon: 'ph-instagram-logo' },
-                        { href: 'https://tiktok.com/@heloconfeitaria10', icon: 'ph-tiktok-logo' },
-                        { href: 'https://wa.me/5588981577625', icon: 'ph-whatsapp-logo' },
-                    ].map(({ href, icon }) => (
+                    {redesRodape.map(({ href, icon }) => (
                         <a key={icon} href={href} target="_blank" rel="noreferrer"
                             style={{ width: '48px', height: '48px', background: 'var(--cream)', color: 'var(--primary)', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s', boxShadow: '0 10px 15px -3px rgba(0,0,0,.1)', position: 'relative', zIndex: 3, pointerEvents: 'auto', cursor: 'pointer', touchAction: 'manipulation' }}
                             onClick={e => {
@@ -8520,17 +9488,17 @@ var RodapeSite = (window.HeloComponents && window.HeloComponents.RodapeSite)
                     ))}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', color: 'rgba(243,212,148,.8)', fontSize: '14px', marginBottom: '1.1rem', fontWeight: '500' }}>
-                    <a href="https://maps.app.goo.gl/FrmNpC4iGrVxfw8u9" target="_blank" rel="noreferrer"
+                    <a href={hrefMapsFb} target="_blank" rel="noreferrer"
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'color .15s' }}
                         onMouseEnter={e => e.currentTarget.style.color = '#fff'} onMouseLeave={e => e.currentTarget.style.color = 'rgba(243,212,148,.8)'}>
                         <i className="ph-fill ph-map-pin" style={{ fontSize: '20px', color: 'var(--cream)' }}></i>
-                        Rua Anastácio Paulo de Sousa, 63 - Nova Aldeota
+                        {linhaEnderecoFb}
                     </a>
-                    <a href="https://wa.me/5588981577625" target="_blank" rel="noreferrer"
+                    <a href={hrefWhatsFb} target="_blank" rel="noreferrer"
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'color .15s' }}
                         onMouseEnter={e => e.currentTarget.style.color = '#fff'} onMouseLeave={e => e.currentTarget.style.color = 'rgba(243,212,148,.8)'}>
                         <i className="ph-fill ph-whatsapp-logo" style={{ fontSize: '20px', color: 'var(--cream)' }}></i>
-                        (88) 98157-7625
+                        {telefoneFb}
                     </a>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '1.8rem', background: 'rgba(243,212,148,.08)', border: '1px solid rgba(243,212,148,.2)', borderRadius: '16px', padding: '10px 20px' }}>
@@ -8550,7 +9518,8 @@ var RodapeSite = (window.HeloComponents && window.HeloComponents.RodapeSite)
                 </p>
             </div>
         </footer>
-    ));
+        );
+    });
 
 var VitrineProdutos = (window.HeloComponents && window.HeloComponents.VitrineProdutos)
     ? ((props) => {

@@ -4,15 +4,23 @@
   "description": "Build local dos scripts JSX do site da Helo Confeitaria.",
   "scripts": {
     "build:public": "node ./scripts/build-public-js.js",
-    "prepare:hosting": "npm run build:public && node ./scripts/stamp-version.js && node ./scripts/strip-bom.js public",
+    "validate:html": "node ./scripts/validate-html-pages.js",
+    "prepare:hosting": "npm run build:public && node ./scripts/test-client-ranking.js && node ./scripts/validate-html-pages.js && node ./scripts/stamp-version.js && node ./scripts/strip-bom.js public",
+    "test:ranking": "node ./scripts/test-client-ranking.js",
     "deploy:hosting": "firebase deploy --only hosting",
-    "deploy:hosting:ci": "firebase deploy --project helo-confeitaria --only hosting"
+    "deploy:hosting:ci": "firebase deploy --project helo-confeitaria --only hosting",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:functions:ci": "firebase deploy --project helo-confeitaria --only functions",
+    "functions:env:sync": "node functions/scripts/sync-deploy-env.js",
+    "functions:smoke:pix": "node functions/scripts/smoke-pix-endpoints.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "esbuild": "^0.28.0"
+    "@phosphor-icons/web": "^2.1.2",
+    "esbuild": "^0.28.0",
+    "sharp": "^0.34.5"
   }
 }

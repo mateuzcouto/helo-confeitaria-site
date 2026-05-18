@@ -51,7 +51,7 @@ O projeto usa **duas páginas HTML completamente separadas**:
 - React (unpkg) + Phosphor web + Firebase; folha extra [`public/css/admin-settings.css`](public/css/admin-settings.css).
 - `app-config` → `text-date-utils` → `contatos-loja-publica` → `campaign-utils`.
 - Componentes compartilhados para **pré-visualização** e rodapé: `brand-logo`, `cabecalho`, `rodape-site`, `store-closed-vitrina`, `admin/admin-toggle-pill`, `admin/admin-settings-card`.
-- `app.js` → `carrinho.js` → `crm.js` → `financeiro.js` → `estoque.js` → `admin-utils` → `catalog.js` → `core-globals.js` → `app-admin.js`.
+- `app.js` → `carrinho.js` → `crm.js` → `financeiro.js` → `estoque.js` → `admin-utils` → **`core/analytics/client-ranking.js`** → `catalog.js` → `core-globals.js` → `app-admin.js`.
 - `script.js` (AdminPanel pesado) é carregado **sob demanda** após fluxo de login/feedback (lazy), não como `<script>` fixo no HTML.
 - QZ Tray também é carregado sob demanda na primeira impressão/diagnóstico.
 - **Não carrega** para o cliente final: `product-card`, `vitrine-produtos`, `cart-ui`, `main-app`, `chat-widget` (estes ficam só na vitrine).
@@ -233,10 +233,20 @@ Navegador (React renderiza)
 ### Scripts NPM
 
 ```bash
-npm run build:public      # Transpila JSX → JS (desenvolvimento)
-npm run prepare:hosting   # Build + versioning + strip-BOM (pré-deploy)
-npm run deploy:hosting    # Deploy para produção (Firebase Hosting)
+npm run build:public        # Transpila JSX → js-build/ (esbuild)
+npm run validate:html       # Valida referências de script nos HTML (dual-HTML)
+npm run test:ranking        # Testes unitários HeloClientRanking (Node)
+npm run prepare:hosting     # build + test:ranking + validate:html + stamp-version + strip-bom
+npm run deploy:hosting      # firebase deploy --only hosting (predeploy roda prepare:hosting)
 ```
+
+Ordem interna de `prepare:hosting` (não pular etapas em CI):
+
+1. `build:public`
+2. `scripts/test-client-ranking.js`
+3. `scripts/validate-html-pages.js`
+4. `scripts/stamp-version.js`
+5. `scripts/strip-bom.js public`
 
 ---
 
@@ -255,6 +265,7 @@ Scripts carregados via `<script>` expõem APIs em objetos globais:
 | `window.HeloCart` | `carrinho.js` | Hooks do carrinho |
 | `window.HeloCrm` | `crm.js` | CRM (admin only) |
 | `window.HeloFinance` | `financeiro.js` | Financeiro (admin only) |
+| `window.HeloClientRanking` | `core/analytics/client-ranking.js` | Ranking Top Clientes por período (admin; JS puro, testável) |
 | `window.HeloInventory` | `estoque.js` | Estoque (admin only) |
 | `window.HeloComponents` | `components/*.component.js` | Componentes React (vitrine + utilitários registrados em `HeloComponents.*`) |
 | `window.HeloPublicContact` | `core/constants/contatos-loja-publica.js` | WhatsApp, redes e helpers (`montarHrefWhatsAppLojaPublica`, lista de ícones do rodapé) — **fonte única** vitrine + pré-visualização admin |
@@ -343,6 +354,7 @@ admin. O backlog é considerado parte do contrato de manutenção.
 | 16/05/2026 | **`functions/package.json` — override `asynckit` removido:** o pin a `0.5.0` não alterava a instalação efetiva (`npm ls asynckit` sem entradas) e era destacado por análise estática (Meterian / CWE-1104). Overrides remanescentes: `uuid`, `retry-request`, `yargs` | Manifest alinhado à árvore real; política: não declarar override para pacote transitivo ausente; se `asynckit` reaparecer, corrigir na dependência que o introduz |
 | 18/05/2026 | **Pós-evento (vitrine + admin):** módulo único `HeloPublicContact`; helpers de texto UTF-8 / sanitização de `announcementText` em `text-date-utils.js`; `site_settings` com metadata + `get({ source: 'server' })` na reconexão (§5.5.1); componentes `HeloAdminUi` + `store-closed-vitrina` para cartões configuráveis e pré-visualização em **Sistema → Configurações**; `admin-settings.css`; entradas novas em `build-public-js.js` | Menos divergência de contatos e cache; UX admin alinhada à vitrine sem expor `main-app` no painel |
 | 18/05/2026 | **Cache WebView (Instagram):** `deploy-version.json` + bootstrap inline em `index.html` / `confirmacao.html`; headers `no-cache` para JSON/manifest; `stamp-version.js` alinha `VERSAO_ASSETS_ESTATICOS` | Cliente vê deploy novo sem refresh manual no in-app browser da Meta |
+| 18/05/2026 | **Ranking Top Clientes por período:** `HeloClientRanking` (`core/analytics/client-ranking.js`), hook `useRankingClientesPeriodo`, UI com chips Hoje/Semana/Mês/7d/30d e toggle valor×pedidos; query única `orders` `createdAt >=` janela Fortaleza; `prepare:hosting` inclui testes + validate HTML; deploy hosting `20260518-225751` | Ranking justo (só pagos/prontos/concluídos); sem depender do snapshot global de 500 pedidos |
 
 ### 10.1 PIX — modo legado × InfinitePay
 
@@ -353,13 +365,36 @@ admin. O backlog é considerado parte do contrato de manutenção.
 
 Persistência: `getMetaDoc('site_settings').set({ … }, { merge: true })` inclui `infinityPayEnabled` (boolean). Estado inicial no admin e na vitrine: `false` até o admin gravar `true`.
 
-### 10.2 Clientes inativos (reativação)
+### 10.2 Top Clientes — ranking por período
+
+- **Onde:** admin → **Clientes** → **Top Clientes** (`tab === 'customers'` em `public/js/script.js`).
+- **Motor:** `public/js/core/analytics/client-ranking.js` → `window.HeloClientRanking` (IIFE, **sem JSX**, sem Firestore).
+- **API principal:** `calcularLimitesPeriodo`, `calcularInicioJanelaConsulta`, `pedidoElegivelParaRanking`, `agregarPedidosPorCliente`, `ordenarRanking`, `obterTopN`, `construirRankingsPorPeriodo`.
+- **Pedidos válidos:** status `Pago`, `Pronto`, `Concluído` (alinhado ao financeiro); telefone com ≥8 dígitos; agrupamento por **últimos 8 dígitos** do `customerPhone`.
+- **Períodos (fuso `America/Fortaleza`):**
+
+  | Chave UI | Significado |
+  | --- | --- |
+  | `hoje` | Dia civil atual |
+  | `semana` | Segunda-feira 00:00 (Fortaleza) até agora |
+  | `mes` | Mês civil atual |
+  | `rolling7` | Últimos 7×24h |
+  | `rolling30` | Últimos 30×24h |
+
+- **Métricas (toggle na UI):** `spent` (R$ total) ou `count` (nº de pedidos); desempate pela outra métrica, depois nome.
+- **Firestore (uma query por visita à aba):** `useRankingClientesPeriodo` em `script.js` — `getCol('orders').where('createdAt', '>=', inicioTs).orderBy('createdAt', 'desc').limit(3000)` com `inicioJanela = min(início mês civil, agora − 30d)`. **Não** usa o snapshot global de `allOrders` (limitado a 500 fora da aba Pedidos). Filtro de **campanha** (`insightsCampaignFilter`) **após** o fetch. Se `snap.size >= 3000`, aviso na UI.
+- **UI:** chips de período, toggle Valor/Qtd., card **Melhor cliente do período**, tabela top **50**, botão **Atualizar**, **Criar Story** (top 3 do recorte), rótulo de período (ex.: semana civil com datas).
+- **Build / HTML:** entrada em `scripts/build-public-js.js`; `<script defer src="./js-build/core/analytics/client-ranking.js">` em `admin.html` **antes** de `catalog.js` / `app-admin.js` (garante `HeloClientRanking` quando `script.js` carrega sob demanda).
+- **Testes:** `npm run test:ranking` ou `node scripts/test-client-ranking.js` (integrado ao `prepare:hosting`).
+- **Índice Firestore:** filtro só em `createdAt` + `orderBy createdAt` — índice simples automático; status filtrado no cliente.
+
+### 10.3 Clientes inativos (reativação)
 
 - **Onde:** painel admin → navbar **Clientes** → tab secundária **Inativos** (`tab === 'inativos'` em `public/js/script.js`).
 - **Critério:** último pedido do cliente (por telefone normalizado) com data **`createdAt` há mais de 30 dias corridos** — não é calendário “mês cheio”, mas corresponde ao pedido de negócio “~1 mês sem recompra”.
 - **UI:** cards com dias sem comprar, data da última compra, cores por urgência (ex. 30–59 dias), link **Chamar no WhatsApp**; botão para **exportar relatório HTML** quando há inativos (`ClientesInativosAlerta`, `useClientesInativos(allOrders, 30)`).
 
-### 10.3 WhatsApp opcional via n8n (VPS)
+### 10.4 WhatsApp opcional via n8n (VPS)
 
 - **Onde:** admin **Sistema → Configurações** — seção **Mensagens WhatsApp automáticas (n8n)**. Persistência exige **Salvar automação n8n no Firebase** ou **Salvar Configurações** (fim da página); o resumo “Estado salvo no Firebase” / linha **WhatsApp automático (n8n)** no bloco de status deve refletir **ligado** após gravar.
 - **Firestore:** `artifacts/.../meta/site_settings` campo `n8nWhatsAppAutomationsEnabled`. O backend aceita **boolean `true` ou string `"true"`** (console manual). **URLs e segredos não ficam no Firestore** — apenas a flag (`site_settings` é legível por usuários autenticados).
@@ -371,7 +406,7 @@ Persistência: `getMetaDoc('site_settings').set({ … }, { merge: true })` inclu
 - **n8n (VPS):** workflow publicado e **Active**; URL do `.env` = Production do Webhook; validação do Bearer no fluxo (nó Code/IF conforme [`docs/n8n-workflow-helo-firebase.json`](docs/n8n-workflow-helo-firebase.json)). Se o Webhook estiver configurado para responder via nó **Respond to Webhook**, esse nó deve existir no caminho de execução — caso contrário o `fetch` do backend pode expirar aguardando resposta.
 - **Deploy:** após alterar `.env` das functions, `firebase deploy --only functions`; após alterar admin JSX, `npm run prepare:hosting` + deploy hosting (predeploy já roda o prepare).
 
-### 10.4 Melhorias pós-evento (vitrina, textos e `site_settings`)
+### 10.5 Melhorias pós-evento (vitrina, textos e `site_settings`)
 
 - **Contatos únicos:** `public/js/core/constants/contatos-loja-publica.js` define `window.HeloPublicContact`. Rodapé (`rodape-site.component.js`), estado loja fechada (`store-closed-vitrina.component.js`) e fallback no admin (`script.js`) leem apenas esse objeto — alterar números/URLs num único ficheiro.
 - **UTF-8 / marketing:** `text-date-utils.js` expõe correção sanitização de texto vindo do Firestore (evita “mojibake” típico em `announcementText` e campos parecidos).
@@ -384,16 +419,18 @@ Persistência: `getMetaDoc('site_settings').set({ … }, { merge: true })` inclu
 ### 11.1 Documentação (obrigatória antes ou junto com o deploy)
 
 - [ ] `README.md` atualizado com mudanças visíveis ao time / operação.
-- [ ] `PDR.md` atualizado se houver decisão técnica ou entrada nova no §10 / §10.1 / §10.2 / §10.3 / **§10.4** / §5.5.1 (histórico, PIX, clientes inativos, n8n, pós-evento, `site_settings`).
+- [ ] `PDR.md` atualizado se houver decisão técnica ou entrada nova no §10 / §10.1 / §10.2 / §10.3 / §10.4 / **§10.5** / §5.5.1 (histórico, PIX, ranking clientes, clientes inativos, n8n, pós-evento, `site_settings`).
 - [ ] Comentários / JSDoc no código nos pontos alterados (regra de negócio ou função pública).
 - [ ] Se houver alteração em `functions/package.json` (dependências ou `overrides`): `cd functions && npm install` e conferir scanner de supply chain / `npm audit` conforme processo do repositório.
 
 ### 11.2 Build e hospedagem
 
 - [ ] `npm run build:public` sem erros (ou confiar no predeploy do Firebase que roda `prepare:hosting`).
-- [ ] `npm run prepare:hosting` completa quando rodada manualmente.
+- [ ] `npm run prepare:hosting` completa quando rodada manualmente (inclui `test-client-ranking` e `validate:html` sem falhas).
+- [ ] `npm run test:ranking` passa localmente após alterar `client-ranking.js` ou agregação no hook.
 - [ ] Vitrine sem erros no DevTools Console (`http://localhost:5000/` ou produção).
 - [ ] Admin sem erros no DevTools Console (`http://localhost:5000/admin.html` ou produção).
+- [ ] **Top Clientes:** alternar períodos e métricas; confirmar que `Novo`/`Cancelado` não entram; card #1 coerente com a tabela.
 - [ ] Nenhum script de admin em `index.html`.
 - [ ] Subconjunto de vitrine em `admin.html` limitado ao que está no HTML (rodapé, loja fechada, contatos + UI admin): **sem** `main-app.js`, **sem** `cart-ui.js`, **sem** grid de produtos.
 - [ ] `firebase deploy --only hosting` (ou `npm run deploy:hosting`) executa com sucesso — predeploy aplica build + stamp de versão nos HTML.
