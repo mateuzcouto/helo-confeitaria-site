@@ -18,14 +18,91 @@
     <link rel="preconnect" href="https://firestore.googleapis.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" href="./css/style.css?v=20260509-053850" as="style" />
+    <!-- Preconnect Firebase Auth, SDK gstatic e Storage para reduzir latência SSL em 3G -->
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin />
 
-    <meta name="deploy-version" content="20260509-053850" />
+    <!-- Google Fonts carregado diretamente no HTML (não via @import no CSS).
+         Técnica: rel="preload" as="style" com onload="this.rel='stylesheet'"
+         carrega a CSS de fontes em paralelo ao style.css principal, sem bloquear
+         a renderização. O noscript garante fallback para browsers sem JS.
+         @update 2026-05-09 — elimina cascata @import → 300–500ms a menos em 3G. -->
+    <link rel="preload" as="style"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Great+Vibes&family=Nunito:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript>
+      <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Great+Vibes&family=Nunito:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" />
+    </noscript>
+
+    <!-- Preload do logo hero em WebP — inicia o download antes de parsear o CSS.
+         `fetchpriority` em <link> não é suportado no Firefox/Opera (só Chromium);
+         omitimos para compatibilidade e para silenciar avisos do Edge Tools.
+         O preload em si já antecipa o fetch em todos os browsers modernos.
+         @update 2026-05-09 — WebP 93 KB vs PNG original 387 KB (76% menor). -->
+    <link rel="preload" as="image" href="./LOGO HELÔ.webp" type="image/webp" />
+
+    <link rel="preload" href="./css/style.css?v=20260518-222624" as="style" />
+    <!-- Preload dos bundles críticos: config → firebase app → entrypoint principal.
+         Permite ao browser iniciar o download antes de parsear os <script defer>. -->
+    <link rel="preload" href="./js-build/core/config/app-config.js?v=20260518-222624" as="script" />
+    <link rel="preload" href="./js-build/app.js?v=20260518-222624" as="script" />
+    <link rel="preload" href="./js-build/main-app.js?v=20260518-222624" as="script" />
+
+    <meta name="deploy-version" content="20260518-222624" />
+    <!-- Reconcilia HTML cacheado (WebView Instagram) com deploy-version.json antes do app. -->
+    <script>
+      (function () {
+        var CHAVE_SESSAO = 'helo_deploy_checked';
+        function obterVersaoLocal() {
+          var m = document.querySelector('meta[name="deploy-version"]');
+          return m && m.content ? String(m.content).trim() : '';
+        }
+        function verificarDeployRemoto() {
+          var local = obterVersaoLocal();
+          if (!local) return;
+          var heloParam = null;
+          try {
+            heloParam = new URLSearchParams(location.search).get('_helo');
+          } catch (e) { /* URLSearchParams indisponível */ }
+          fetch('./deploy-version.json?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (dados) {
+              if (!dados || !dados.version) return;
+              var remota = String(dados.version).trim();
+              if (!remota || local === remota) {
+                try { sessionStorage.setItem(CHAVE_SESSAO, remota || local); } catch (e) {}
+                return;
+              }
+              if (heloParam === remota) {
+                try { sessionStorage.setItem(CHAVE_SESSAO, remota); } catch (e) {}
+                return;
+              }
+              try {
+                if (sessionStorage.getItem(CHAVE_SESSAO) === remota) return;
+                sessionStorage.setItem(CHAVE_SESSAO, remota);
+              } catch (e) {}
+              location.replace(
+                location.pathname + '?_helo=' + encodeURIComponent(remota) + location.hash
+              );
+            })
+            .catch(function () {});
+        }
+        verificarDeployRemoto();
+        window.addEventListener('pageshow', function (ev) {
+          if (ev.persisted) verificarDeployRemoto();
+        });
+      })();
+    </script>
     <meta
       name="description"
       content="Helô Confeitaria: Sistema profissional de pedidos e gestão. Confeitaria e doces artesanais com delivery. Peça pelo WhatsApp, Facebook ou acesse nosso portal de vendas."
     />
-    <meta name="theme-color" content="#8B4513" />
+    <!-- Cor da barra de UI (Chrome/Edge/Samsung Internet): definida via cabeçalho HTTP
+         Theme-Color em firebase.json (alinha com manifest.json theme_color #2A3D5D).
+         Evita <meta name="theme-color"> aqui — ferramentas de compatibilidade marcam essa
+         meta como não suportada no Firefox/Opera (MDN: progressive enhancement no HTML). -->
 
     <!-- Open Graph (OG) - Compartilhamento em Redes Sociais -->
     <meta property="og:type" content="business.business" />
@@ -75,17 +152,34 @@
     <link
       rel="icon"
       type="image/svg+xml"
-      href="./favicon.svg?v=20260509-053850"
+      href="./favicon.svg?v=20260518-222624"
     />
     <link
       rel="alternate icon"
       type="image/x-icon"
-      href="./favicon.ico?v=20260509-053850"
+      href="./favicon.ico?v=20260518-222624"
     />
-    <link rel="shortcut icon" href="./favicon.ico?v=20260509-053850" />
+    <link rel="shortcut icon" href="./favicon.ico?v=20260518-222624" />
 
-    <script defer src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Web App Manifest — habilita instalação como PWA no Android (Chrome/Edge)
+         e "Adicionar à Tela Inicial" no iOS (Safari). Exibe splash screen, modo
+         standalone (sem barra de URL) e ícone de app personalizado.
+         @update 2026-05-09 — Otimização Mobile Round 2. -->
+    <link rel="manifest" href="./manifest.json" />
+    <!-- Metatags Apple para iOS Safari (complementam o manifest) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Helô" />
+    <!-- Apple touch: usa o SVG existente em public/ (evita 404 com icon-192.png ausente). -->
+    <link rel="apple-touch-icon" href="./favicon.svg" />
+
+    <!-- React e ReactDOM servidos localmente (public/vendor/) para eliminar
+         o hop extra ao CDN unpkg em redes lentas (3G). Arquivos idênticos
+         à versão @18 do unpkg; atualize o vendor/ manualmente ao subir versão.
+         Firebase Hosting serve esses arquivos do mesmo CDN do app — mesma
+         latência das páginas, sem round-trip adicional a um CDN externo. -->
+    <script defer src="./vendor/react.production.min.js"></script>
+    <script defer src="./vendor/react-dom.production.min.js"></script>
 
     <!-- Bibliotecas do Firebase (Apenas as necessárias para Banco de Dados e Auth) -->
     <script defer src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
@@ -96,7 +190,7 @@
     <link
       rel="stylesheet"
       id="app-style"
-      href="./css/style.css?v=20260509-053850"
+      href="./css/style.css?v=20260518-222624"
     />
   </head>
 
@@ -107,65 +201,71 @@
            Este HTML/CSS aparece INSTANTANEAMENTE enquanto o React e o Firebase
            estão carregando. Evita o "flash" de tela branca.
            ═══════════════════════════════════════════════════════════════════════ -->
-      <div style="display: flex; flex-direction: column; min-height: 100vh; font-family: 'Inter', sans-serif; background: #fff;">
-        <div style="height: 72px; background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; border-bottom: 1px solid #f1f5f9;">
+      <div class="esqueleto-inicial-raiz">
+        <div class="esqueleto-inicial-barra-topo">
           <!-- Logo placeholder — div simples, sem img, para evitar 404 durante skeleton -->
-          <div style="width: 140px; height: 32px; background: linear-gradient(90deg, #f1f5f9, #e8edf3); border-radius: 8px;" aria-hidden="true"></div>
-          <div style="width: 44px; height: 44px; background: #f1f5f9; border-radius: 12px;" aria-hidden="true"></div>
+          <div class="esqueleto-inicial-placeholder-logo" aria-hidden="true"></div>
+          <div class="esqueleto-inicial-placeholder-acao" aria-hidden="true"></div>
         </div>
-        <div class="shimmer" style="height: 340px; background: #f8fafc; margin-bottom: 2rem;"></div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 2rem; padding: 0 1.5rem;">
-          <div style="height: 420px; background: #fff; border-radius: 24px; padding: 1.2rem; border: 1px solid #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
-            <div style="height: 240px; background: #f1f5f9; border-radius: 16px; margin-bottom: 1.5rem;"></div>
-            <div style="height: 24px; background: #f1f5f9; border-radius: 6px; width: 85%; margin-bottom: 1rem;"></div>
-            <div style="height: 16px; background: #f1f5f9; border-radius: 6px; width: 45%;"></div>
+        <div class="esqueleto-inicial-faixa-hero" aria-hidden="true"></div>
+        <div class="esqueleto-inicial-grade-cards">
+          <div class="esqueleto-inicial-card">
+            <div class="esqueleto-inicial-card-imagem" aria-hidden="true"></div>
+            <div class="esqueleto-inicial-linha-titulo" aria-hidden="true"></div>
+            <div class="esqueleto-inicial-linha-subtitulo" aria-hidden="true"></div>
           </div>
-          <div style="height: 420px; background: #fff; border-radius: 24px; padding: 1.2rem; border: 1px solid #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.02); opacity: 0.6;">
-            <div style="height: 240px; background: #f1f5f9; border-radius: 16px; margin-bottom: 1.5rem;"></div>
-            <div style="height: 24px; background: #f1f5f9; border-radius: 6px; width: 85%; margin-bottom: 1rem;"></div>
-            <div style="height: 16px; background: #f1f5f9; border-radius: 6px; width: 45%;"></div>
+          <div class="esqueleto-inicial-card esqueleto-inicial-card--atenuado">
+            <div class="esqueleto-inicial-card-imagem" aria-hidden="true"></div>
+            <div class="esqueleto-inicial-linha-titulo" aria-hidden="true"></div>
+            <div class="esqueleto-inicial-linha-subtitulo" aria-hidden="true"></div>
           </div>
         </div>
-        <style>
-          .shimmer {
-            background: linear-gradient(90deg, #f8fafc 25%, #f1f5f9 50%, #f8fafc 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite linear;
-          }
-          @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-          }
-        </style>
       </div>
     </div>
-    <script defer src="./js-build/components/brand-logo.component.js?v=20260509-053850"></script>
-    <script defer src="./js-build/components/cabecalho.component.js?v=20260509-053850"></script>
-    <script defer src="./js-build/components/rodape-site.component.js?v=20260509-053850"></script>
-    <script defer src="./js-build/components/product-card.component.js?v=20260509-053850"></script>
-    <script defer src="./js-build/components/vitrine-produtos.component.js?v=20260509-053850"></script>
+    <script defer src="./js-build/core/config/app-config.js?v=20260518-222624"></script>
+    <script defer src="./js-build/core/utils/text-date-utils.js?v=20260518-222624"></script>
+    <script defer src="./js-build/core/constants/contatos-loja-publica.js?v=20260518-222624"></script>
+    <script defer src="./js-build/components/brand-logo.component.js?v=20260518-222624"></script>
+    <script defer src="./js-build/components/cabecalho.component.js?v=20260518-222624"></script>
+    <script defer src="./js-build/components/rodape-site.component.js?v=20260518-222624"></script>
+    <script defer src="./js-build/components/product-card.component.js?v=20260518-222624"></script>
+    <script defer src="./js-build/components/vitrine-produtos.component.js?v=20260518-222624"></script>
+    <script defer src="./js-build/components/store-closed-vitrina.component.js?v=20260518-222624"></script>
     <!-- ═══════════════════════════════════════════════════════════════════════
          SCRIPTS DA VITRINE PÚBLICA (Cliente Final)
-         Ordem de dependência (não alterar): js-build/app.js → carrinho →
-         admin-utils → catalog → core-globals → cart-ui → main-app.js
-         main-app é gerado com IIFE próprio (build-public-js) mas ainda exige
-         app.js antes para window.HeloApp. Após deploy, atualizar ?v=20260509-053850 neste HTML.
+         Ordem de dependência (não alterar):
+         app-config → text-date-utils + contatos públicos → componentes de marca
+         → store-closed (HeloPublicContact) → app.js → carrinho → … → main-app.js
+         app-config DEVE vir antes de app.js para que enableOfflinePersistence
+         e outras configs sejam lidas antes da inicialização do Firebase.
+         Após deploy, atualizar ?v=20260518-222624 em todos os scripts abaixo.
 
          IMPORTANTE: Todos em ./js-build/ (transpilados)
          Browsers não conseguem executar JSX direto.
          ═══════════════════════════════════════════════════════════════════════ -->
-    <script defer src="./js-build/app.js?v=20260509-053850"></script>
-    <script defer src="./js-build/carrinho.js?v=20260509-053850"></script>
+    <script defer src="./js-build/app.js?v=20260518-222624"></script>
+    <script defer src="./js-build/carrinho.js?v=20260518-222624"></script>
     <!-- admin-utils.js e catalog.js são dependências compartilhadas usadas
          tanto pela vitrine quanto pelo painel. Mantidos aqui porque o
          main-app.js precisa de constantes do catálogo. -->
-    <script defer src="./js-build/core/utils/admin-utils.js?v=20260509-053850"></script>
-    <script defer src="./js-build/core/catalog.js?v=20260509-053850"></script>
-    <script defer src="./js-build/core-globals.js?v=20260509-053850"></script>
-    <script defer src="./js-build/cart-ui.js?v=20260509-053850"></script>
-    <script defer src="./js-build/main-app.js?v=20260509-053850"></script>
-    <!-- Ícones não são críticos para o primeiro render da vitrine -->
-    <script defer src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script defer src="./js-build/core/utils/admin-utils.js?v=20260518-222624"></script>
+    <script defer src="./js-build/core/catalog.js?v=20260518-222624"></script>
+    <script defer src="./js-build/core-globals.js?v=20260518-222624"></script>
+    <script defer src="./js-build/cart-ui.js?v=20260518-222624"></script>
+    <script defer src="./js-build/main-app.js?v=20260518-222624"></script>
+    <!-- Phosphor Icons — self-hosted em /vendor/phosphor/ (apenas variantes usadas).
+         O site usa somente ph-bold (195 ocorrências) e ph-fill (21 ocorrências).
+         Servir localmente elimina DNS lookup + TLS extra ao unpkg.com e reduz
+         o payload de 7 variantes (~700 KB CSS) para apenas 2 (~168 KB CSS).
+         Firebase Hosting aplica Cache-Control: max-age=31536000, immutable.
+         @update 2026-05-09 — Otimização Mobile Round 2.
+         Ícones não são críticos para o primeiro render — carregam após o conteúdo. -->
+    <link rel="stylesheet" href="./vendor/phosphor/bold/style.css" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="./vendor/phosphor/fill/style.css" media="print" onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet" href="./vendor/phosphor/bold/style.css" />
+      <link rel="stylesheet" href="./vendor/phosphor/fill/style.css" />
+    </noscript>
     <!-- ═══════════════════════════════════════════════════════════════════════
          NOTA DE ARQUITETURA (Fase 1 — Otimização de Performance):
          Os seguintes módulos foram REMOVIDOS do index.html pois pertencem

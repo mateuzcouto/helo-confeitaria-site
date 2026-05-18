@@ -55,7 +55,7 @@ const gerarIdCampoFormulario = () => `${FORM_FIELD_UID_SEED}_${(++formFieldUidCo
    após um deploy. A versão é atualizada manualmente a cada release. */
 
 /** Versão atual dos assets estáticos para cache-bust (atualizar a cada deploy). */
-const VERSAO_ASSETS_ESTATICOS = '20260415-2235';
+const VERSAO_ASSETS_ESTATICOS = '20260518-222624';
 
 /**
  * Constrói URL de asset com parâmetro de cache-bust.
@@ -107,8 +107,11 @@ const MINUTOS_VISIBILIDADE_CONCLUIDOS = 15;
 /** Milissegundos equivalentes aos minutos de visibilidade (para cálculos com Date). */
 const MS_VISIBILIDADE_CONCLUIDOS = MINUTOS_VISIBILIDADE_CONCLUIDOS * 60 * 1000;
 
-/** Status que indicam pedido ativo (ainda não concluído nem cancelado). */
-const STATUS_ATIVOS_OPERACAO = ['Novo', 'Confirmado', 'Pago', 'Pronto'];
+/** Status que indicam pedido ativo (ainda não concluído nem cancelado).
+ *
+ * @update 2026-05-14 — Inclui AguardandoPagamento (PIX InfinitePay antes do webhook).
+ */
+const STATUS_ATIVOS_OPERACAO = ['Novo', 'AguardandoPagamento', 'Confirmado', 'Pago', 'Pronto'];
 
 /* ═══════════════════════════════════════════════════════════════════════
    5. CONVERSÃO DE TIMESTAMP PARA MILLIS

@@ -51,6 +51,10 @@
           {
             "key": "Cache-Control",
             "value": "no-cache, no-store, must-revalidate"
+          },
+          {
+            "key": "Theme-Color",
+            "value": "#2A3D5D"
           }
         ]
       },
@@ -60,11 +64,37 @@
           {
             "key": "Cache-Control",
             "value": "no-cache, no-store, must-revalidate"
+          },
+          {
+            "key": "Theme-Color",
+            "value": "#2A3D5D"
           }
         ]
       },
       {
         "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          },
+          {
+            "key": "Theme-Color",
+            "value": "#2A3D5D"
+          }
+        ]
+      },
+      {
+        "source": "/deploy-version.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/manifest.json",
         "headers": [
           {
             "key": "Cache-Control",
@@ -103,6 +133,14 @@
       {
         "source": "/api/groq/**",
         "function": "groqChat"
+      },
+      {
+        "source": "/api/pix/checkout",
+        "function": "criarCheckoutPix"
+      },
+      {
+        "source": "/api/pix/confirm",
+        "function": "confirmarPagamentoPix"
       }
     ]
   }
